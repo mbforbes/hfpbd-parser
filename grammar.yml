@@ -57,6 +57,26 @@ verbs:
             -   name: gripper
                 known: True
 
+    -   name: close
+        id: close_gripper
+        components:
+            -   name: close
+                known: False
+
+            -   name: side
+
+            -   name: gripper
+                known: True
+
+    -   name: save
+        id: save_pose
+        components:
+            -   name: save
+                known: False
+
+            -   name: pose
+                known: True
+
 # Templates are blocks with multile options, like "right" or "left". The
 # options are themselves primitives (so far...) and thus are not
 # expanded as primitive blocks. They can include a default; this is
@@ -86,6 +106,12 @@ primitives:
             - gripper
             - claw
 
+    -   name: gripper
+        synonyms:
+            - gripper
+            - hand
+            - claw
+
     -   name: rotate
         synonyms:
             - rotate
@@ -96,8 +122,17 @@ primitives:
             - open
             - release
 
-    -   name: gripper
+    -   name: close
         synonyms:
-            - gripper
-            - hand
-            - claw
+            - close
+            - grasp
+            - clench
+
+    -   name: save
+        synonyms:
+            - save
+
+    -   name: pose
+        synonyms:
+            - pose
+            - step

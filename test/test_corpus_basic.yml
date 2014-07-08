@@ -10,7 +10,15 @@
 # "<name of test group 2>":
 #     ...
 #
-"low_level_rotate_fully_specified":
+
+########################################################################
+# LOW LEVEL TESTS (DIRECT MOTOR CONTROL)
+########################################################################
+
+# rotate l/r gripper CW/CCW
+########################################################################
+
+"low_level_rotate_specified":
     -
         - rotate left wrist clockwise
         - rotate left wrist clockwise
@@ -50,3 +58,79 @@
     -
         - rotate counterclockwise
         - clarify
+
+"low_level_rotate_synonyms":
+    -
+        - twist right claw
+        - rotate right wrist clockwise
+    -
+        - twist left hand counterclockwise
+        - rotate left wrist counterclockwise
+
+# open l/r gripper
+########################################################################
+
+"low_level_open_specified":
+    -
+        - open right gripper
+        - open right gripper
+    -
+        - open left gripper
+        - open left gripper
+
+"low_level_open_uneeded_words_missing":
+    -
+        - open right
+        - open right gripper
+    -
+        - open left
+        - open left gripper
+
+"low_level_open_synonyms":
+    -
+        - release right claw
+        - open right gripper
+    -
+        - release left hand
+        - open left gripper
+
+# close l/r gripper
+########################################################################
+
+"low_level_close_specified":
+    -
+        - close right gripper
+        - close right gripper
+    -
+        - close left gripper
+        - close left gripper
+
+"low_level_close_uneeded_words_missing":
+    -
+        - close right
+        - close right gripper
+    -
+        - close left
+        - close left gripper
+
+
+# save pose
+########################################################################
+
+"low_level_save_specified":
+    -
+        - save pose
+        - save pose
+    -
+        - close left
+        - close left gripper
+
+"low_level_save_uneeded_words_missing":
+    -
+        - save
+        - save pose
+
+"low_level_save_synonyms":
+    -
+        - save step
+        - save pose
