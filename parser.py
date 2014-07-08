@@ -316,7 +316,7 @@ class CommandParser:
                 clarify_codes.add(code)
 
         # Debug printing
-        Debug.p('CommandParser.p got')
+        Debug.p('CommandParser.parse (' + self.get_keyword() + ') got:')
         Debug.pl(1, 'keyword: ' + self.get_keyword())
         Debug.pl(1, 'options: ' + ' '.join([str(o) for o in options]))
         Debug.pl(1, 'inferred: ' + ' '.join([str(i) for i in inferred]))
