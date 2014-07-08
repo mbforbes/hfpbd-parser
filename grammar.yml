@@ -70,7 +70,7 @@ templates:
     -   name: rot_dir
         options:
             - clockwise
-            - counter-clockwise
+            - counterclockwise
         default: clockwise
 
 # Primitives are just synonyms for a words. All synonyms for a primitive

@@ -1,0 +1,14 @@
+language: python
+python:
+    - "2.7"
+install:
+    - sudo pip install pep8 pytest coverage python-coveralls
+script:
+# Lint
+    - pep8 bayes_parser.py
+# Test
+    - coverage run --source bayes_parser -m test.bayes_tester
+after_success:
+# Upload test results
+    - coveralls
+

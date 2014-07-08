@@ -29,7 +29,7 @@ import yaml
 ########################################################################
 
 # Global options
-DEBUG_PRINTING_DEFAULT = True
+DEBUG_PRINTING_DEFAULT = False
 
 # The command returned to the robot when there is clarification needed.
 CLARIFY_COMMAND = 'clarify'

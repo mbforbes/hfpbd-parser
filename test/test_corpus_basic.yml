@@ -1,12 +1,52 @@
 # The format is:
-# - <name of test group 1>
+#
+# "<name_of_test_group_1>":
 #     -
-#        - <query 1>
-#        - <expected response to query 1>
-- low level rotate:
+#        - <query1>
+#        - <expected response to query1>
+#     -
+#        - <query2>
+#        - <expected response to query2>
+# "<name of test group 2>":
+#     ...
+#
+"low_level_rotate_fully_specified":
     -
-        - boo
-        - bar
+        - rotate left wrist clockwise
+        - rotate left wrist clockwise
     -
-        - baz
-        - bash
+        - rotate right wrist clockwise
+        - rotate right wrist clockwise
+    -
+        - rotate left wrist counterclockwise
+        - rotate left wrist counterclockwise
+    -
+        - rotate right wrist counterclockwise
+        - rotate right wrist counterclockwise
+
+"low_level_rotate_uneeded_words_missing":
+    -
+        - rotate left clockwise
+        - rotate left wrist clockwise
+    -
+        - rotate right counterclockwise
+        - rotate right wrist counterclockwise
+
+"low_level_rotate_needed_words_missing":
+    -
+        - left clockwise
+        - rotate left wrist clockwise
+    -
+        - right clockwise
+        - rotate right wrist clockwise
+
+"low_level_rotate_clarify":
+    -
+        - rotate
+        - clarify
+    -
+        - rotate clockwise
+        - clarify
+    -
+        - rotate counterclockwise
+        - clarify
