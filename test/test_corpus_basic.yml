@@ -1,0 +1,12 @@
+# The format is:
+# - <name of test group 1>
+#     -
+#        - <query 1>
+#        - <expected response to query 1>
+- low level rotate:
+    -
+        - boo
+        - bar
+    -
+        - baz
+        - bash

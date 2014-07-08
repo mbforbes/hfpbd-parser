@@ -74,10 +74,10 @@ templates:
         default: clockwise
 
 # Primitives are just synonyms for a words. All synonyms for a primitive
-# are treated equivalently. Note that the "name" attribute does not
-# represent what is actually considered a synonym; it is a marker for
-# reference in verb templates. To use it as an actual synonym, it must
-# be repeated in the synonyms list. See "wrist" for example.
+# are treated equivalently. Note that the "name" attribute must appear
+# in the synonym list as well for it to be used (it serves otherwise as
+# a reference name for the grammar as well as the word to use for robot
+# commands).
 primitives:
     -   name: wrist
         synonyms:

@@ -21,7 +21,7 @@ __author__ = 'mbforbes'
 ########################################################################
 
 # Builtins
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import yaml
 
 
@@ -189,6 +189,35 @@ class VerbPhrase:
         else:
             return self._make_command(results)
 
+    def generate_commands(self):
+        '''Generates all commands possible for the given verb.
+
+        Returns:
+            [str]
+        '''
+        commands = []
+        cnames = [c['name'] for c in self.components]
+        tcs = [
+            self.template_blocks[k] for k in cnames
+            if k in self.template_blocks]
+        pcs = [
+            self.primitive_blocks[k] for k in cnames
+            if k in self.primitive_blocks]
+        components = tcs + pcs
+
+        for block in components:
+            words = block.expand_command()
+            if len(commands) == 0:
+                commands = words
+            else:
+                # Append permutations
+                new_commands = []
+                for command in commands:
+                    for word in words:
+                        new_commands += [' '.join([command, word])]
+                commands = new_commands
+        return new_commands
+
     def eval(self, utterance):
         '''
         See how likely the verb phrase is by evaluating an utterance
@@ -277,6 +306,16 @@ class TemplateBlock:
         self.options = options
         self.default = default
 
+    def expand_command(self):
+        '''
+        Expand the template block for all options for *commands*
+        (commands to the robot). This includes all options.
+
+        Return:
+            [str]: all options for the template block.
+        '''
+        return self.options[:]  # Returns shallow copy
+
     def eval(self, utterance):
         '''
         Args:
@@ -349,6 +388,17 @@ class PrimitiveBlock:
         self.name = name
         self.synonyms = synonyms
 
+    def expand_command(self):
+        '''
+        Expand the primitive block for all options for *commands*
+        (commands to the robot). For primitives, we always use the
+        name field.
+
+        Return
+            [str]: List with one element: the name of the primitive
+        '''
+        return [self.name]
+
     def eval(self, utterance, known):
         '''
         Args:
@@ -413,22 +463,22 @@ class Grammar:
         Grammar.weights = self.raw_grammar['weights']
 
         # Build up primitives
-        self.primitive_blocks = {}
+        self.primitive_blocks = OrderedDict()
         for primitive in self.raw_grammar['primitives']:
             name = primitive['name']
             synonyms = primitive['synonyms']
             self.primitive_blocks[name] = PrimitiveBlock(name, synonyms)
 
         # Build up templates
-        self.template_blocks = {}
+        self.template_blocks = OrderedDict()
         for template in self.raw_grammar['templates']:
             name = template['name']
             options = template['options']
             default = template['default'] if 'default' in template else None
             self.template_blocks[name] = TemplateBlock(name, options, default)
 
-        # Build up verbs.
-        self.verb_blocks = {}
+        # Build up verbs
+        self.verb_blocks = OrderedDict()
         for verb in self.raw_grammar['verbs']:
             name = verb['name']
             id_ = verb['id']
@@ -440,6 +490,12 @@ class Grammar:
                 self.template_blocks,
                 self.primitive_blocks
             )
+
+        # As a debug, generate all possible commands and print them.
+        all_commands = self.generate_commands()
+        Debug.p('All possible commands:')
+        for command in all_commands:
+            Debug.pl(1, command)
 
     def eval(self, utterance):
         '''
@@ -464,6 +520,19 @@ class Grammar:
                 Debug.p(' '.join([str(last_prob), str(item)]))
         # Return the last (the most likely)
         return last_prob, item[0], item[1]
+
+    def generate_commands(self):
+        '''Generates all possible commands this grammar could send to
+        the robot.
+
+        Returns:
+            [str]: List of all strings that can be returned as robot
+                commands.
+        '''
+        all_commands = []
+        for verb_name, verb_block in self.verb_blocks.iteritems():
+            all_commands += verb_block.generate_commands()
+        return all_commands
 
     @staticmethod
     def _check_grammar(raw_grammar):
@@ -495,14 +564,36 @@ class BayesParser:
     def __init__(self, grammar_filename='grammar.yml'):
         self.grammar = Grammar(grammar_filename)
 
-    def parse(self, utterance):
+    def _parse(self, utterance):
+        '''
+        Returns: tuple of:
+            int: prob,
+            str: command,
+            str: speech
+        '''
         # Preprocess into array (easier 'word in' testing)
         utterance = utterance.lower().split(' ')
         Debug.p('Processed utterance:' + str(utterance))
 
-        # Eval (this prints... won't later)
-        prob, command, speech = self.grammar.eval(utterance)
-        return speech
+        # Eval with grammar
+        return self.grammar.eval(utterance)
+
+    def parse_return_command(self, utterance):
+        '''
+        Primarily for testing / real use.
+        Returns:
+            str: command sent to robot
+        '''
+        return self._parse(utterance)[1]
+
+    def parse_return_speech(self, utterance):
+        '''
+        For interactive testing (debugging / demonstration).
+
+        Returns:
+            str: speech robot says to human
+        '''
+        return self._parse(utterance)[2]
 
 
 # Debugging
@@ -535,6 +626,6 @@ if __name__ == '__main__':
     bp = BayesParser()
     print 'Welcome to the Bayes hfpbd parser.'
     while True:
-        res = bp.parse(raw_input('> '))
+        res = bp.parse_return_speech(raw_input('> '))
         print ''.join(['>>> ', res])
     print 'Exiting.'
