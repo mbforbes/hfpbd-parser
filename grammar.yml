@@ -1,0 +1,76 @@
+# Because we're doing probabilistic inference over the parsing, we need
+# to have weights to return when parsing events happen (like seeing or
+# not seeing some kind of word).
+weights:
+    # This is the weight for when a word is seen.
+    seen: 1.0
+
+    # This is the weight for when a word is not seen, but it is known in
+    # a command. For example, in the command rotate, if <wrist> isn't
+    # seen (i.e. "wrist", "hand", or "gripper"), but it provides no
+    # information to a command and requires no clarification, then we
+    # keep its weight at this.
+    known: 0.9
+
+    # This is the weight for when a word is not seen, but it has a
+    # reasonable default in a command. For example, in the command
+    # rotate, if the <rot_dir> isn't seen (e.g. "clockwise" or
+    # "counter-clockwise"), then we pick the default
+    default: 0.7
+
+    # This is the weight for multiple options for a word are seen. For
+    # example, if "left" and "right" are both seen for a side template,
+    # the returned weight would be the "multiple" weight.
+    multiple: 0.5
+
+    # This is the weight for when a word is not seen, and it is required
+    # or is core to the command. For example, "rotate" in a rotate
+    # command.
+    unseen: 0.1
+
+# Verbs are the core of commands; every command to the robot must have
+# exactly one verb.
+verbs:
+    -   name: rotate
+        # Not sure whether this id field is necessary; it's meant to
+        # mimic the names given in the PbD planning doc.
+        id: rotate_wrist
+        components:
+            -   name: rotate
+                known: False
+
+            -   name: wrist
+                known: True
+
+            -   name: side
+            -   name: rot_dir
+# Templates are blocks with multile options, like "right" or "left". The
+# options are primitives (so far...). They can include a default.
+templates:
+    -   name: side
+        options:
+            - right
+            - left
+
+    -   name: rot_dir
+        options:
+            - clockwise
+            - counter-clockwise
+        default: clockwise
+
+# Primitives are just synonyms for a words. All synonyms for a primitive
+# are treated equivalently. Note that the "name" attribute does not
+# represent what is actually considered a synonym; it is a marker for
+# reference in verb templates. To use it as an actual synonym, it must
+# be repeated in the synonyms list. See "wrist" for example.
+primitives:
+    -   name: wrist
+        synonyms:
+            - wrist
+            - hand
+            - gripper
+
+    -   name: rotate
+        synonyms:
+            - rotate
+            - twist
