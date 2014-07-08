@@ -1,15 +1,8 @@
-'''Parser for hfpbd.
+'''Template-based Parser for hfpbd.'''
 
-Stretch feature list:
-    - Remember previous state for querying top-level commad. If the user
-        specified options for something (e.g. 'counter-clockwise') then
-        we should remember that when we ask for the command. This kind
-        of goes with the next one....
+__author__ = 'mbforbes'
 
-    - Provide inference for command (e.g. 'rotate right
-        counter-clockwise' is missing the keyword 'rotate,' but we have
-        strong evidence that the keyword should have been 'rotate')
-'''
+
 # Imports
 ########################################################################
 

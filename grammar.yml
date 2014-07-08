@@ -39,13 +39,28 @@ verbs:
             -   name: rotate
                 known: False
 
+            -   name: side
+
             -   name: wrist
                 known: True
 
-            -   name: side
             -   name: rot_dir
+
+    -   name: open
+        id: open_gripper
+        components:
+            -   name: open
+                known: False
+
+            -   name: side
+
+            -   name: gripper
+                known: True
+
 # Templates are blocks with multile options, like "right" or "left". The
-# options are primitives (so far...). They can include a default.
+# options are themselves primitives (so far...) and thus are not
+# expanded as primitive blocks. They can include a default; this is
+# neither required nor always desired.
 templates:
     -   name: side
         options:
@@ -69,8 +84,20 @@ primitives:
             - wrist
             - hand
             - gripper
+            - claw
 
     -   name: rotate
         synonyms:
             - rotate
             - twist
+
+    -   name: open
+        synonyms:
+            - open
+            - release
+
+    -   name: gripper
+        synonyms:
+            - gripper
+            - hand
+            - claw
