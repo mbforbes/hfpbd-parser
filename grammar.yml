@@ -76,6 +76,13 @@ verbs:
 
             -   name: pose
                 known: True
+    -   name: move
+        id: move_macro
+        components:
+            -   name: move
+                known: False
+
+            -   name: move_dir
 
 # Templates are blocks with multile options, like "right" or "left". The
 # options are themselves primitives (so far...) and thus are not
@@ -92,6 +99,22 @@ templates:
             - clockwise
             - counterclockwise
         default: clockwise
+
+    -   name: move_dir
+        options:
+            # Note: (up, higher), (lower, down), etc. should be synonyms
+            # encapsulated in template primitives.
+            - up
+            - higher
+            - lower
+            - down
+            - right
+            - left
+            # Note: this is a hack for multiple words.
+            - towards-robot
+            - away-from-robot
+            - towards-me
+            - away-from-me
 
 # Primitives are just synonyms for a words. All synonyms for a primitive
 # are treated equivalently. Note that the "name" attribute must appear
@@ -136,3 +159,7 @@ primitives:
         synonyms:
             - pose
             - step
+
+    -   name: move
+        synonyms:
+            - move

@@ -29,7 +29,7 @@ import yaml
 ########################################################################
 
 # Global options
-DEBUG_PRINTING_DEFAULT = False
+DEBUG_PRINTING_DEFAULT = True
 
 # The command returned to the robot when there is clarification needed.
 CLARIFY_COMMAND = 'clarify'
@@ -115,9 +115,11 @@ class VerbPhrase:
         pre = 'I heard: '
         mid = (
             ' '.join(response_pieces) if len(response_pieces) > 1
-            else response_pieces)
+            else response_pieces[0])
         clarify_pre = '. Your options are: '
-        clarify = ' or '.join(clarify_pieces)
+        clarify = (
+            ' or '.join(clarify_pieces) if len(clarify_pieces) > 1
+            else clarify_pieces[0])
         return ''.join([pre, mid, clarify_pre, clarify])
 
     def _make_command(self, results):
