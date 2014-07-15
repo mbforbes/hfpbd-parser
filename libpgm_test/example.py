@@ -11,15 +11,21 @@ from libpgm.tablecpdfactorization import TableCPDFactorization
 # load nodedata and graphskeleton
 nd = NodeData()
 skel = OrderedSkeleton()
-nd.load("node_data.json")
+nd.load("example_nodedata.json")
 skel.load("example_graph.json")
 
 # load evidence
 # evidence = dict(Letter='weak')
 # query = dict(Grade='A')
 
-evidence = dict(Letter='weak')
-query = dict(Intelligence='barbarbar')
+evidence = {
+	# 'Intelligence': 'low',
+	'Difficulty': 'hard',
+	'Grade': 'B',
+	# 'SAT': 'highscore',
+	# 'Letter': 'weak'
+}
+query = {'Intelligence':''}
 
 # load bayesian network
 bn = DiscreteBayesianNetwork(skel, nd)
@@ -29,9 +35,14 @@ fn = TableCPDFactorization(bn)
 
 # calculate probability distribution
 result = fn.condprobve(query, evidence)
+print result.vals
 
-# output
-print json.dumps(result.vals, indent=2)
+# calculate specific query (need val in {key: val} for this query)
+# result = fn.specificquery(query, evidence)
+# print result
+
+# (original output)
+# print json.dumps(result.vals, indent=2)
 # print json.dumps(result.scope, indent=2)
 # print json.dumps(result.card, indent=2)
 # print json.dumps(result.stride, indent=2)
