@@ -1,0 +1,7 @@
+{
+    "V": ["Letter", "Grade", "Intelligence", "SAT", "Difficulty"],
+    "E": [["Intelligence", "Grade"],
+        ["Difficulty", "Grade"],
+        ["Intelligence", "SAT"],
+        ["Grade", "Letter"]]
+}

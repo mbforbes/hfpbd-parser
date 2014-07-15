@@ -1,0 +1,40 @@
+{
+	"V": ["Sprinkler", "Rain", "Grass wet"],
+	"E": [
+		["Rain", "Sprinkler"],
+		["Rain", "Grass wet"],
+		["Sprinkler", "Grass wet"]
+	],
+
+	"Vdata": {
+		"Rain": {
+			"numoutcomes": 2,
+			"vals": ["true", "false"],
+			"parents": null,
+			"children": ["Sprinkler", "Grass wet"],
+			"cprob": [0.2, 0.8]
+		},
+		"Sprinkler": {
+			"numoutcomes": 2,
+			"vals": ["true", "false"],
+			"parents": ["Rain"],
+			"children": ["Grass wet"],
+			"cprob": {
+				"['true']": [0.01, 0.99],
+				"['false']": [0.4, 0.6]
+			}
+		},
+		"Grass wet": {
+			"numoutcomes": 2,
+			"vals": ["true", "false"],
+			"parents": ["Sprinkler", "Rain"],
+			"children": null,
+			"cprob": {
+				"['false', 'false']": [0.0, 1.0],
+				"['false', 'true']": [0.8, 0.2],
+				"['true', 'false']": [0.9, 0.1],
+				"['true', 'true']": [0.99, 0.01]
+			}
+		}
+	}
+}
