@@ -5,10 +5,10 @@ install:
     - sudo pip install pep8 pytest coverage python-coveralls
 script:
 # Lint
-    - pep8 bayes_parser.py
+    - pep8 *.py
 # Test
-    - coverage run --source bayes_parser -m test.bayes_tester
-after_success:
+    # - coverage run --source bayes_parser -m test.bayes_tester
+# after_success:
 # Upload test results
-    - coveralls
+    # - coveralls
 
