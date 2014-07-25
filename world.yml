@@ -1,0 +1,23 @@
+# Note: all arrays are for [right, left] arms.
+objects:
+    -   name: obj0
+        # Relation to arms.
+        is_pickupable: [true, false]
+        is_above_reachable: [false, false]
+        is_nextto_reachable: [false, false]
+        # Relation to other objects. These should be more general.
+        is_leftmost: false
+        is_righttmost: false
+        is_biggest: false
+        is_smallest: false
+        has_distinct_color: false
+        has_distinct_type: false
+robot:
+    # open, closed_empty, has_obj
+    gripper_states: [closed_empty, closed_empty]
+    # right, left, neither
+    last_cmd_side: left
+    can_move_up: [true, true]
+    can_move_down: [false, false]
+    can_move_toleft: [true, true]
+    can_move_toright: [false, true]

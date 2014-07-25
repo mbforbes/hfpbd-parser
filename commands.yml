@@ -1,0 +1,37 @@
+commands:
+    move_rel:
+        - relpos
+        - obj
+        - side
+    move_abs:
+        - absdir
+        - side
+    pickup:
+        - obj
+        - side
+    place:
+        - relpos
+        - obj
+        - side
+    lookat:
+        - obj
+    open:
+        - side
+    close:
+        - side
+    save:
+options:
+    relpos:
+        - above
+        - nextto
+    absdir:
+        - up
+        - down
+        - toleft
+        - toright
+# obj is a special case; it's expanded by the objects available to the
+# system.
+    obj:
+    side:
+        - right
+        - left
