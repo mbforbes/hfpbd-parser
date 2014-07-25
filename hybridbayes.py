@@ -115,7 +115,7 @@ def generate_all_commands(commands, objects={}):
         objects (dict)
 
     Returns:
-        [str]: Commands, space separated
+        [Command]: Commands
     '''
     # Pre-extract object options.
     objs = [o['name'] for o in objects]
@@ -153,7 +153,7 @@ def generate_all_commands(commands, objects={}):
     print 'number of commands:', len(all_results)
     return all_results
 
-def apply_w(commands, objects):
+def c_apply_w(commands, objects):
     '''
     Applies world (objects) influence to command scores.
 
@@ -205,7 +205,7 @@ def apply_w(commands, objects):
                 if not loc_reachable:
                     c.score += P_OBJUNR
 
-def apply_r(commands, robot):
+def c_apply_r(commands, robot):
     '''
     Applies robot (state) influence to command scores.
 
@@ -257,6 +257,29 @@ def apply_r(commands, robot):
             if not loc_reachable:
                 c.score += P_LOCUNR
 
+def generate_all_sentences(commands, objects={}):
+    '''
+    Args:
+        commands ([Command])
+        vocab (dict): YAML-loaded
+
+    Returns:
+        [Sentence]
+    '''
+    pass
+
+
+def l_apply_w(sentences, objects):
+    '''
+    Applies world (objects) influence to language scores.
+
+    Args:
+        sentences ([Sentence])
+        objects (dict)
+    '''
+    pass
+
+
 def normalize(commands):
     '''
     Normalizes command scores to a valid probability distribution.
@@ -281,14 +304,15 @@ def score(commands_dict, objects, robot):
         commands_dict (dict): Direct, YAML-loaded commands dictionary.
         objects (dict): objects map (e.g. in world YAML file)
         robot (dict): robot map (e.g. in world YAML file)
-    Return:
+
+    Returns:
         Command: top-scoring command
     '''
     commands = generate_all_commands(commands_dict, objects)
 
     # Calc P(C|W,R)
-    apply_w(commands, objects)
-    apply_r(commands, robot)
+    c_apply_w(commands, objects)
+    c_apply_r(commands, robot)
     normalize(commands)
 
     # Calc P(L|W,R,C)
