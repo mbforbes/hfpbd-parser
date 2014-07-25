@@ -1,0 +1,7 @@
+vocab:
+    commands:
+        move_rel:
+            - move
+            - obj
+            - relpos
+            # - side

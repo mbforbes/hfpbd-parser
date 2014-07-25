@@ -8,6 +8,7 @@
 import code
 import copy
 import pprint
+import sys
 import yaml
 
 ########################################################################
@@ -15,9 +16,13 @@ import yaml
 ########################################################################
 
 # Global options
+ERROR_PRINTING_DEFAULT = True
+INFO_PRINTING_DEFAULT = True
 DEBUG_PRINTING_DEFAULT = False
+
 COMMAND_GRAMMAR = 'commands.yml'
 WORLD = 'world.yml'
+VOCAB = 'vocab.yml'
 OBJ_COMPONENT = 'obj'  # We expand this component by name.
 
 # How to index into object properties by side
@@ -37,40 +42,62 @@ M_RP = {
     'toright': 'can_move_toright',
 }
 
-
 # Score-related
 START_SCORE = 0.0  # To begin with. Maybe doesn't matter.
 MIN_SCORE = 10.0  # Minimum score for normalizing. Only adds to match.
 P_NOOBJ = -80  # Penalty: there's no object and the score requires one.
 P_LOCUNR = -50  # Penalty: the requested location is unreachable.
 P_OBJUNR = -50  # Penalty: the requested object cannot be picked up.
-P_NOTLASTSIDE = -10 # Penalty: the side wasn't the last commanded.
-P_GSTATE = -80 # Penalty: nonsensical gripper state change requested.
-P_BADPP = -50 # Penalty: bad pickup/place command requested (from GS)
+P_NOTLASTSIDE = -10  # Penalty: the side wasn't the last commanded.
+P_GSTATE = -80  # Penalty: nonsensical gripper state change requested.
+P_BADPP = -50  # Penalty: bad pickup/place command requested (from GS)
+
 
 ########################################################################
 # Classes
 ########################################################################
 
-# Debugging
-class Debug:
-    printing = DEBUG_PRINTING_DEFAULT
+class Logger:
+    printing = False
+    prefix = '[IMPLEMENT ME]'
 
-    @staticmethod
-    def p(obj):
-        Debug.pl(0, obj)
+    @classmethod
+    def p(cls, obj):
+        cls.pl(0, obj)
 
-    @staticmethod
-    def pl(level, obj):
+    @classmethod
+    def pl(cls, level, obj):
         '''
         Args:
             level (int): how many tabs (one space if 0)
             obj (Object): what to print
         '''
         string = str(obj)
-        if Debug.printing:
+        if cls.printing:
             indent = ' ' if level == 0 else '\t' * (level + 1)
-            print ''.join(['[DEBUG]', indent, string])
+            print ''.join([cls.prefix, indent, string])
+
+
+# Error
+class Error(Logger):
+    printing = ERROR_PRINTING_DEFAULT
+    prefix = '[ERROR]'
+
+
+# Debugging
+class Info(Logger):
+    printing = INFO_PRINTING_DEFAULT
+    prefix = '[INFO]'
+
+
+# Debugging
+class Debug(Logger):
+    printing = DEBUG_PRINTING_DEFAULT
+    prefix = '[DEBUG]'
+
+
+
+
 
 class Command:
     '''A fully-instantiated command.
@@ -103,6 +130,7 @@ class Command:
         param_str = ', '.join(
             [': '.join([str(k), str(v)]) for k, v in self.params.iteritems()])
         return "%s   %s   %s" % (score_str, name_str, param_str)
+
 
 ########################################################################
 # Functions
@@ -150,8 +178,9 @@ def generate_all_commands(commands, objects={}):
         # += [cmd_results] groups list by command; could be useful...
         all_results += cmd_results
     # Display
-    print 'number of commands:', len(all_results)
+    Debug.p('number of commands: ' + len(all_results))
     return all_results
+
 
 def c_apply_w(commands, objects):
     '''
@@ -205,6 +234,7 @@ def c_apply_w(commands, objects):
                 if not loc_reachable:
                     c.score += P_OBJUNR
 
+
 def c_apply_r(commands, robot):
     '''
     Applies robot (state) influence to command scores.
@@ -257,6 +287,7 @@ def c_apply_r(commands, robot):
             if not loc_reachable:
                 c.score += P_LOCUNR
 
+
 def generate_all_sentences(commands, objects={}):
     '''
     Args:
@@ -298,6 +329,7 @@ def normalize(commands):
     for c in commands:
         c.score = c.score / sum_
 
+
 def score(commands_dict, objects, robot):
     '''
     Args:
@@ -325,6 +357,48 @@ def score(commands_dict, objects, robot):
     print '-- Total:', sum([c.score for c in commands])
     return commands[0]
 
+
+def check_vocab(vocab_dict, commands_dict):
+    '''
+    Ensures vocab entires are comprehensive of commands_dict entries.
+
+    Both sets of commands should match exactly.
+
+    The components of vocab should be a superset of the components of
+    commands.
+
+    Args:
+        commands_dict (dict): Direct, YAML-loaded commands dictionary.
+        vocab_dict (dict): Direct, YAML-loaded vocab dictionary.
+
+    '''
+    failed = False
+    # Check all in vocab are in commands.
+    for cmd, components in vocab_dict['vocab']['commands'].iteritems():
+        if cmd not in commands_dict['commands']:
+            failed = True
+            Error.p('Command ' + cmd + ' not in commands dict.')
+
+    # Check commands AND components in commands are in vocab.
+    for cmd, components in commands_dict['commands'].iteritems():
+        if cmd not in vocab_dict['vocab']['commands']:
+            failed = True
+            Error.p('Command ' + cmd + ' not in vocab dict.')
+        else:
+            # We have the command; make sure all components in commands
+            # are in vocab.
+            for component in components:
+                if component not in vocab_dict['vocab']['commands'][cmd]:
+                    failed = True
+                    Error.p(
+                        'Component ' + component + ' found in commands dict ' +
+                        cmd + ' but not in vocab dict.')
+
+    # We really want to make sure these match.
+    if failed:
+        sys.exit(1)
+
+
 ########################################################################
 # Main
 ########################################################################
@@ -337,6 +411,11 @@ def main():
     objects = world_dict['objects']
     robot = world_dict['robot']
     # objects = {}  # For testing no objects.
+
+    vocab_dict = yaml.load(open(VOCAB))
+
+    # Check stuff
+    check_vocab(vocab_dict, commands_dict)
 
     # Do stuff
     # code.interact(local=locals())
