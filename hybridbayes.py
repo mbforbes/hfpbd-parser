@@ -542,6 +542,7 @@ class WordOption(Option):
     def get_phrases(self):
         return self.phrases
 
+
 class ObjectOption(Option):
     '''Holds options info for object, so can generate all possible
     referring phrases.'''
@@ -577,6 +578,7 @@ class ObjectOption(Option):
         # TODO(mbforbes): Implement this fully using object properties.
         return [Phrase(self.name, DefaultMatcher)]
 
+
 class Sentence:
     '''Our representation of a perfect 'utterance'.
 
@@ -610,9 +612,10 @@ class Sentence:
         for phrase in self.phrases:
             phrase_score = phrase.score(utterance)
             # Debug.pl(
-                # 2,
-                # "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
+            #     2,
+            #     "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
             self.score += phrase_score
+
 
 class Phrase:
     '''Holds a set of words and a matching strategy for determining if
@@ -672,7 +675,6 @@ class Phrase:
 
 class MatchingStrategy:
     '''Interface for matching strategies.'''
-
 
     @staticmethod
     def match(words, utterance):
@@ -735,7 +737,7 @@ class NotSideMatcher:
         '''
         bad_follow_words = ['hand', 'arm']
         # Get basic test out of the way.
-        if not words in utterance:
+        if words not in utterance:
             return False
 
         # At this point, the words are in the utterance. Check whether
@@ -753,6 +755,7 @@ class NotSideMatcher:
 
         # OK!
         return True
+
 
 class Matchers:
     # Indexes into classes
@@ -840,16 +843,6 @@ def main():
     Debug.p('Sentences:')
     for s in sentences:
         Debug.pl(1, s)
-
-    # OLD
-    # ---
-    # Check stuff
-    # check_vocab(commands_dict)
-    # generate_all_sentences(commands_dict)
-
-    # Do stuff
-    # code.interact(local=locals())
-    # score(commands_dict, objects, robot)
 
 if __name__ == '__main__':
     main()
