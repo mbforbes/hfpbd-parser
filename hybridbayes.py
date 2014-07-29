@@ -31,6 +31,8 @@ Here's the process:
         (Command.final_p).
 '''
 
+__author__ = 'mbforbes'
+
 ########################################################################
 # Imports
 ########################################################################
@@ -41,7 +43,11 @@ from collections import OrderedDict
 import copy
 import pprint
 import sys
+import threading
 import yaml
+
+# Local
+from matchers import DefaultMatcher, NotSideMatcher, Matchers
 
 ########################################################################
 # Module-level constants
@@ -52,7 +58,7 @@ DEBUG = True  # Turn off for significant speedups.
 
 ERROR_PRINTING_DEFAULT = True
 INFO_PRINTING_DEFAULT = True
-DEBUG_PRINTING_DEFAULT = True
+DEBUG_PRINTING_DEFAULT = False
 
 COMMAND_GRAMMAR = 'commands.yml'
 WORLD = 'world.yml'
@@ -79,7 +85,7 @@ M_RP = {
 
 # Command score
 START_SCORE = 0.0  # To begin with. Maybe doesn't matter.
-MIN_SCORE = 1.0  # Minimum score for normalizing. Only adds to match.
+MIN_SCORE = 0.1  # Minimum score for normalizing. Only adds to match.
 P_LOCUNR = -5.0  # Penalty: the requested location is unreachable.
 P_OBJUNR = -5.0  # Penalty: the requested object cannot be picked up.
 P_NOTLASTSIDE = -1.0  # Penalty: the side wasn't the last commanded.
@@ -87,10 +93,13 @@ P_GSTATE = -8.0  # Penalty: nonsensical gripper state change requested.
 P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 
 # Language score
-LANG_MATCH_SCORE = 9.0
-LANG_UNMATCH_SCORE = -9.0
-CMD_PHRASE_MATCH_SCORE = 9.0
-CMD_PHRASE_UNMATCH_SCORE = -9.0
+LANG_MATCH_SCORE = 20.0
+LANG_UNMATCH_SCORE = -10.0
+CMD_PHRASE_MATCH_START = 0.1
+CMD_PHRASE_MATCH_CMD = 1.0  # Maximum given for matching command options.
+CMD_PHRASE_MATCH_PHRASE = 1.0  # Maximum given for matching utterance phrases.
+# CMD_PHRASE_MATCH_SCORE = 20.0
+# CMD_PHRASE_UNMATCH_SCORE = -10.0
 
 
 ########################################################################
@@ -498,10 +507,10 @@ class Command:
             sys.exit(1)
 
         # Ensure sentence scores normalized.
-        sum_ = sum(s.score for s in sentences)
-        if not Util.are_floats_close(sum_, 1.0):
-            Error.p('Sentence scores are not normed: %0.3f' % (sum_))
-            sys.exit(1)
+        # sum_ = sum(s.score for s in sentences)
+        # if not Util.are_floats_close(sum_, 1.0):
+        #     Error.p('Sentence scores are not normed: %0.3f' % (sum_))
+        #     sys.exit(1)
 
         # Check a few things for all commands.
         for c in commands:
@@ -519,11 +528,11 @@ class Command:
                     sys.exit(1)
 
             # Ensure sentence match scores normalized.
-            sum_ = sum(p for s, p in c.sentence_match_probs.iteritems())
-            if not Util.are_floats_close(sum_, 1.0):
-                Error.p(
-                    'Command sentence_match_probs not normed: %0.3f' % (sum_))
-                sys.exit(1)
+            # sum_ = sum(p for s, p in c.sentence_match_probs.iteritems())
+            # if not Util.are_floats_close(sum_, 1.0):
+            #     Error.p(
+            #         'Command sentence_match_probs not normed: %0.3f' % (sum_))
+            #     sys.exit(1)
 
     @staticmethod
     def _gen_phrases(todo, results=[]):
@@ -642,44 +651,46 @@ class Command:
 
         Args:
             commands ([Command])
-            robot (dict)
+            robot (Robot)
         '''
-        cmd_side = (
-            self.option_map['side'].name
-            if 'side' in self.option_map else None)
-        side_idx = S[cmd_side] if cmd_side is not None else None
+        # All robot applications so far involve a side.
+        if not self.template.has_params(['side']):
+            return
+
+        cmd_side = self.option_map['side'].name
+        side_idx = S[cmd_side]
 
         # Side: last moved? Less likely down.
-        if self.template.has_params(['side']):
-            last_cmd_side = robot['last_cmd_side']
+        if robot.has_property('last_cmd_side'):
+            last_cmd_side = robot.get_property('last_cmd_side')
             if (last_cmd_side != 'neither' and
                     self.option_map['side'].name != last_cmd_side):
                 self.score += P_NOTLASTSIDE
 
-        # Open/closed & pickup/place: Basd on state (impossible down).
-        if self.name == 'open':
-            gs = robot['gripper_states'][side_idx]
-            if gs == 'open':
-                c.score += P_GSTATE
-        if self.name == 'close':
-            gs = robot['gripper_states'][side_idx]
-            if gs == 'closed_empty' or gs == 'has_obj':
-                self.score += P_GSTATE
-        if self.name == 'pickup':
-            gs = robot['gripper_states'][side_idx]
-            if gs == 'has_obj':
-                self.score += P_BADPP
-        if self.name == 'place':
-            gs = robot['gripper_states'][side_idx]
-            if gs == 'open' or gs == 'closed_empty':
-                self.score += P_BADPP
+        # Open/closed & pickup/place: Basd on gripper state (impossible
+        # configurations have scores lowered).
+        if robot.has_property('gripper_states'):
+            gs = robot.get_property('gripper_states')[side_idx]
+            if self.name == 'open':
+                if gs == 'open':
+                    c.score += P_GSTATE
+            if self.name == 'close':
+                if gs == 'closed_empty' or gs == 'has_obj':
+                    self.score += P_GSTATE
+            if self.name == 'pickup':
+                if gs == 'has_obj':
+                    self.score += P_BADPP
+            if self.name == 'place':
+                if gs == 'open' or gs == 'closed_empty':
+                    self.score += P_BADPP
 
         # move_abs: absdir possible to move to
         if self.name == 'move_abs':
-            robot_prop = M_RP[self.option_map['absdir'].name]
-            loc_reachable = robot[robot_prop][side_idx]
-            if not loc_reachable:
-                self.score += P_LOCUNR
+            prop_name = M_RP[self.option_map['absdir'].name]
+            if robot.has_property(prop_name):
+                loc_reachable = robot.get_property(prop_name)[side_idx]
+                if not loc_reachable:
+                    self.score += P_LOCUNR
 
     def score_match_sentences(self, sentences):
         '''
@@ -702,7 +713,7 @@ class Command:
         scores = []
         phrase_sets = self.get_phrase_sets()
         for sentence in sentences:
-            score = START_SCORE
+            score = CMD_PHRASE_MATCH_START
             s_phrases = sentence.get_phrases()
 
             # We simply count the phrase matches. We want to penalize
@@ -712,26 +723,24 @@ class Command:
 
             # Check whether any phrase for each command option in
             # sentence phrases.
+            n_opts = len(phrase_sets)
+            n_matches = 0
             for phrase_set in phrase_sets:
-                phrase_match = False
                 for phrase in phrase_set:
                     if phrase in s_phrases:
-                        phrase_match = True
-                if phrase_match:
-                    score += CMD_PHRASE_MATCH_SCORE
-                else:
-                    score += CMD_PHRASE_UNMATCH_SCORE
+                        n_matches += 1
+                        break
+            score += (n_matches / n_opts) * CMD_PHRASE_MATCH_CMD
 
             # Check each phrase in the sentence's phrases.
+            n_phrases = len(s_phrases)
+            n_matches = 0
             for s_phrase in s_phrases:
-                phrase_match = False
                 for phrase_set in phrase_sets:
                     if s_phrase in phrase_set:
-                        phrase_match = True
-                if phrase_match:
-                    score += CMD_PHRASE_MATCH_SCORE
-                else:
-                    score += CMD_PHRASE_UNMATCH_SCORE
+                        n_matches += 1
+                        break
+            score += (n_matches / n_phrases) * CMD_PHRASE_MATCH_PHRASE
 
             scores += [score]
             # Debug.pl(1, '%0.2f %s' % (score, str(sentence)))
@@ -881,7 +890,7 @@ class Sentence:
             str
         '''
         phrases = ' '.join(["'" + str(p) + "'" for p in self.phrases])
-        return "%0.4f  %s" % (self.score, phrases)
+        return "%0.6f  %s" % (self.score, phrases)
 
     def get_phrases(self):
         '''
@@ -895,6 +904,7 @@ class Sentence:
         Args:
             utterance (str)
         '''
+        self.score = 0
         # Debug.pl(1, "Scoring sentence: " + str(self))
         for phrase in self.phrases:
             phrase_score = phrase.score(utterance)
@@ -952,96 +962,7 @@ class Phrase:
         return self.words != other.words
 
 
-class MatchingStrategy:
-    '''Interface for matching strategies.'''
 
-    @staticmethod
-    def match(words, utterance):
-        Error.p("MatchingStrategy:match unimplemented as it's an interface.")
-        sys.exit(1)
-
-
-class DefaultMatcher:
-    '''Default matching strategy.'''
-
-    @staticmethod
-    def match(words, utterance):
-        '''Returns whether words match an utterance.
-
-        Args:
-            words (str)
-            utterance (str)
-
-        Returns:
-            bool
-        '''
-        return words in utterance
-
-
-class NotSideMatcher:
-    '''Matching strategy that avoids matching side utterances.'''
-
-    @staticmethod
-    def find_all(words, utterance):
-        '''
-        Finds all indexes of words in utterance.
-
-        Args:
-            words (str)
-            utterance (str)
-
-        Returns:
-            [int]: indexes
-        '''
-        indexes = []
-        start = 0
-        res = utterance.find(words, start)
-        while res > -1:
-            indexes += [res]
-            start = res + 1
-            res = utterance.find(words, start)
-        return indexes
-
-    @staticmethod
-    def match(words, utterance):
-        '''Returns whether words match an utterance, avoiding side
-        utterances.
-
-        Args:
-            words (str)
-            utterance (str)
-
-        Returns:
-            bool
-        '''
-        bad_follow_words = ['hand', 'arm']
-        # Get basic test out of the way.
-        if words not in utterance:
-            return False
-
-        # At this point, the words are in the utterance. Check whether
-        # we're really matching the phrase...
-        indexes = NotSideMatcher.find_all(words, utterance)
-
-        for index in indexes:
-            nextidx = index + len(words) + 1  # + 1 for space
-            # If the next word is 'hand' or 'arm', we've actually
-            # matched one of the side phrases.
-            if nextidx < len(utterance):
-                for bw in bad_follow_words:
-                    if utterance[nextidx:nextidx + len(bw)] == bw:
-                        return False
-
-        # OK!
-        return True
-
-
-class Matchers:
-    # Indexes into classes
-    MATCHERS = {
-        'default': DefaultMatcher,
-        'notside': NotSideMatcher
-    }
 
 
 class WorldObject:
@@ -1067,96 +988,259 @@ class WorldObject:
             wobjs += [wobj]
         return wobjs
 
+class Robot:
+    '''
+    Provides an interface for accessing robot data.
+    '''
+
+    def __init__(self, yaml_dict=None):
+        if yaml_dict is None:
+            yaml_dict = {}
+        self.properties = yaml_dict
+
+    def has_property(self, name):
+        '''
+        Returns whether robot has a property.
+
+        This is really mostly useful for testing, where we might omit
+        the robot state.
+
+        Returns:
+            bool
+        '''
+        return name in self.properties
+
+    def get_property(self, name):
+        '''
+        Gets a robot's property by name.
+
+        Returns:
+            object
+        '''
+        return self.properties[name]
+
+
+class Parser:
+
+    # Couple settings (currently for debugging)
+    display_limit = 5
+
+    def __init__(self, grammar_yaml=COMMAND_GRAMMAR):
+        # Load
+        self.command_dict = CommandDict(yaml.load(open(grammar_yaml)))
+
+        # We can't be updating our guts while we try to churn something
+        # out.
+        self.lock = threading.Lock()
+
+        # Initialize (for clarity)
+        self.world_objects = None
+        self.robot = None
+        self.templates = None
+        self.commands = None
+
+    def simple_interactive_loop(self):
+        '''
+        Answers queries using no world objects and no robot state.
+        '''
+        self.set_world()
+        self._interactive_loop()
+
+    def run_default_query(self):
+        '''
+        Programmatically runs hardcoded query. Useful for debugging.
+        '''
+        # Provide initial world, robot
+        self._set_default()
+        utterance = 'move right hand to the right'
+        res = self.parse(utterance)
+        Info.p(res)
+
+    def default_interactive_loop(self):
+        '''
+        Answers queries using file-saved world objects and robot state.
+        '''
+        # Provide initial world, robot
+        self._set_default()
+        self._interactive_loop()
+
+    def _interactive_loop(self):
+        '''
+        Answers queries using the already-set world objects and robot
+        state.
+        '''
+        while True:
+            utterance = raw_input('> ')
+            Info.p(self.parse(utterance))
+
+    def set_world(self, world_objects=[], robot=Robot()):
+        '''
+        Updates the objects in the world and the robot.
+
+        Args:
+            world_objects ([WorldObject])
+            robot ([Robot])
+        '''
+        self.lock.acquire()
+        self.world_objects = world_objects
+        self.robot = robot
+        self._update_world_internal()
+        self.lock.release()
+
+    def update_objects(self, world_objects=[]):
+        '''
+        Updates only the objects in the world.
+
+        Args:
+            world_objects ([WorldObject])
+        '''
+        self.lock.acquire()
+        # The robot must be set to fully update.
+        self.world_objects = world_objects
+        if robot is not None:
+            self._update_world_internal()
+        self.lock.release()
+
+    def update_robot(self, robot=Robot()):
+        '''
+        Updates only the robot.
+
+        Args:
+            robot ([Robot])
+        '''
+        self.lock.acquire()
+        # The world objects must be set to fully update.
+        self.robot = robot
+        if self.world_objects is not None:
+            self._update_world_internal()
+        self.lock.release()
+
+    def parse(self, utterance):
+        '''
+        Args:
+            utterance (str)
+
+        Returns:
+            Command: The top command.
+        '''
+        self.lock.acquire()
+        if self.world_objects is None or self.robot is None:
+            Error.p('Must set Parser world_objects and robot before parse().')
+            sys.exit(1)
+
+        Info.p("Parser received utterance: " + utterance)
+
+        # Score sentences.
+        for s in self.sentences:
+            s.score_match(utterance)
+        # Util.normalize(sentences)
+
+        # Apply L.
+        Command.apply_l_precheck(self.commands, self.sentences)
+        for c in self.commands:
+            c.apply_l(self.sentences)
+        Util.normalize(self.commands, 'lang_score', 0.0)
+
+        # Get combined probability.
+        for c in self.commands:
+            c.get_final_p()
+        Util.normalize(self.commands, 'final_p', 0.0)
+
+        # Display sentences.
+        self.sentences = sorted(self.sentences, key=lambda x: -x.score)
+        Info.p('Top sentences:')
+        for idx, s in enumerate(self.sentences):
+            if idx < Parser.display_limit:
+                Info.pl(1, s)
+
+        # Display commands.
+        self.commands = sorted(self.commands, key=lambda x: -x.final_p)
+        ptot = 0.0
+        Info.p("Top commands:")
+        for idx, c in enumerate(self.commands):
+            if idx < Parser.display_limit:
+                Info.pl(1, c)
+            ptot += c.final_p
+        Info.p('Total (%d): %0.2f' % (len(self.commands), ptot))
+
+        # TODO(mbforbes): Currently just returning string. Probably want
+        # to serialize needed information instead.
+        ret = self.commands[0].pure_str()
+        self.lock.release()
+
+        return ret
+
+    def _set_default(self):
+        '''
+        Sets "default" (file-specified) world objects and robot.
+        '''
+        world_dict = yaml.load(open(WORLD))
+        w_objects = WorldObject.from_yaml(world_dict['objects'])
+        robot = Robot(world_dict['robot'])
+        self.set_world(w_objects, robot)
+
+    def _update_world_internal(self):
+        '''
+        Args:
+            world_objects ([WorldObject])
+            robot (Robot)
+        '''
+        # Make templates (this extracts options and params).
+        self.templates = self.command_dict.make_templates(self.world_objects)
+        Debug.p('Templates:')
+        for t in self.templates:
+            Debug.pl(1, t)
+        Info.p("Templates: " + str(len(self.templates)))
+
+        # Make commands
+        self.commands = [ct.generate_commands() for ct in self.templates]
+        self.commands = [i for s in self.commands for i in s]  # Flatten.
+        Info.p("Commands: " + str(len(self.commands)))
+
+        # Make sentences
+        self.sentences = [c.generate_sentences() for c in self.commands]
+        self.sentences = [i for s in self.sentences for i in s]  # Flatten.
+        Info.p("Sentences: " + str(len(self.sentences)))
+
+        # Apply W and R to weight C prior.
+        for c in self.commands:
+            c.apply_w()
+            c.apply_r(self.robot)
+        Util.normalize(self.commands)
+
+        # Pre-score commands with all possible sentences.
+        for c in self.commands:
+            c.score_match_sentences(self.sentences)  # Auto-normalizes.
+
+        # Display commands.
+        self.commands = sorted(self.commands, key=lambda x: -x.score)
+        ptot = 0.0
+        Info.p("Top commands (before utterance):")
+        for idx, c in enumerate(self.commands):
+            if idx < Parser.display_limit:
+                Info.pl(1, c)
+            ptot += c.score
+        Info.p('Total (%d): %0.2f' % (len(self.commands), ptot))
+
 
 ########################################################################
 # Main
 ########################################################################
 
 def main():
-    # Display settings.
-    display_limit = 200
+    arg = None
+    if len(sys.argv) > 1:
+        arg = sys.argv[1]
 
-    # Load
-    command_dict = CommandDict(yaml.load(open(COMMAND_GRAMMAR)))
-
-    world_dict = yaml.load(open(WORLD))
-    w_objects = WorldObject.from_yaml(world_dict['objects'])
-    robot_dict = world_dict['robot']
-    # w_objects = []  # For testing no objects.
-
-    # Make templates (this extracts options and params).
-    templates = command_dict.make_templates(w_objects)
-    Debug.p('Templates:')
-    for t in templates:
-        Debug.pl(1, t)
-    Info.p("Templates: " + str(len(templates)))
-
-    # Make commands
-    commands = [ct.generate_commands() for ct in templates]
-    commands = [i for s in commands for i in s]  # Flatten.
-    Info.p("Commands: " + str(len(commands)))
-
-    # Make sentences
-    sentences = [c.generate_sentences() for c in commands]
-    sentences = [i for s in sentences for i in s]  # Flatten.
-    Info.p("Sentences: " + str(len(sentences)))
-
-    # Apply W and R to weight C prior.
-    for c in commands:
-        c.apply_w()
-        c.apply_r(robot_dict)
-    Util.normalize(commands)
-
-    # Pre-score commands with all possible sentences.
-    for c in commands:
-        c.score_match_sentences(sentences)
-
-    # Display commands.
-    commands = sorted(commands, key=lambda x: -x.score)
-    ptot = 0.0
-    Info.p("Top commands (before utterance):")
-    for idx, c in enumerate(commands):
-        if idx < display_limit:
-            Info.pl(1, c)
-        ptot += c.score
-    Info.p('Total (%d): %0.2f' % (len(commands), ptot))
-
-    # Get user input here (normally).
-    utterance = 'move right hand up'
-    Info.p("Utterance: " + utterance)
-
-    # Score sentences.
-    for s in sentences:
-        s.score_match(utterance)
-    Util.normalize(sentences)
-
-    # Apply L.
-    Command.apply_l_precheck(commands, sentences)
-    for c in commands:
-        c.apply_l(sentences)
-    Util.normalize(commands, 'lang_score', 0.0)
-
-    # Get combined probability.
-    for c in commands:
-        c.get_final_p()
-    Util.normalize(commands, 'final_p', 0.0)
-
-    # Display sentences.
-    sentences = sorted(sentences, key=lambda x: -x.score)
-    Info.p('Top sentences:')
-    for idx, s in enumerate(sentences):
-        if idx < display_limit:
-            Info.pl(1, s)
-
-    # Display commands.
-    commands = sorted(commands, key=lambda x: -x.final_p)
-    ptot = 0.0
-    Info.p("Top commands:")
-    for idx, c in enumerate(commands):
-        if idx < display_limit:
-            Info.pl(1, c)
-        ptot += c.final_p
-    Info.p('Total (%d): %0.2f' % (len(commands), ptot))
+    parser = Parser()
+    if arg is None:
+        parser.run_default_query()
+    elif arg == 'interactive':
+        parser.default_interactive_loop()
+    elif arg == 'interactive-simple':
+        parser.simple_interactive_loop()
+    else:
+        Error.p("Unknown option: " + arg)
 
 if __name__ == '__main__':
     main()
