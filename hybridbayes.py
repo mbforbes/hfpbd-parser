@@ -1,4 +1,31 @@
-'''Hybrid approach: Bayes conceptually, score functions in low-level.'''
+'''Hybrid approach: Bayes conceptually, score functions in low-level.
+
+Here's the process:
+    - Extract all Options, which contain Phrases
+        - WordOptions' phrases come from a template (COMMAND_GRAMMAR)
+        - ObjectOptions' phrases come from the object properties
+            (objects are loaded into WorldObjects)
+
+    - Use the Options to build Parameters
+
+    - Use the Paramters to build CommandTemplates
+
+    - Use the CommandTemplates to generate all Commands
+
+    - Apply the world (W) and robot (R) states into the Commands to get
+        a prior over which are most likely (P(C|W,R)).
+
+    - Use all Commands to generate all Sentences
+
+    - Pre-match-score all Commands with Sentences based on Phrase
+        matches (P(C|L))
+
+    - When an utterance comes in, score all Sentences based on Phrase
+        matching strategies (subclass of MatchingStrategy) (P(L))
+
+    - Weight Command-Sentences scores with the Sentence-utterance scores
+        to find the most likely command C.
+'''
 
 ########################################################################
 # Imports
@@ -17,6 +44,8 @@ import yaml
 ########################################################################
 
 # Global options
+DEBUG = True  # Turn off for significant speedups.
+
 ERROR_PRINTING_DEFAULT = True
 INFO_PRINTING_DEFAULT = True
 DEBUG_PRINTING_DEFAULT = True
@@ -24,6 +53,8 @@ DEBUG_PRINTING_DEFAULT = True
 COMMAND_GRAMMAR = 'commands.yml'
 WORLD = 'world.yml'
 OBJ_PARAM = 'obj'
+
+FLOAT_COMPARE_EPSILON = 0.001
 
 # How to index into object properties by side
 S = {'right': 0, 'left': 1}
@@ -53,7 +84,9 @@ P_BADPP = -50  # Penalty: bad pickup/place command requested (from GS)
 
 # Language score
 LANG_MATCH_SCORE = 90
-LANG_UNMATCH_SCORE = -10
+LANG_UNMATCH_SCORE = -90
+CMD_PHRASE_MATCH_SCORE = 90
+CMD_PHRASE_UNMATCH_SCORE = -90
 
 
 ########################################################################
@@ -105,27 +138,63 @@ class Util:
     '''
 
     @staticmethod
-    def normalize(objs, min_score=MIN_SCORE):
-        '''
-        Normalizes objects with a score attribute to a valid probability
-        distribution.
+    def are_floats_close(a, b, epsilon=FLOAT_COMPARE_EPSILON):
+        '''Checks whether two floats are within epsilon of each other.
 
         Args:
-            objs ([Object]): Array of Objects with score attributes.
+            a (float): One number.
+            b (float): The other number.
+            epsilon (float): Acceptable wiggle room (+/-) between a and
+                b.
+
+        Returns:
+            bool: Whether a and b are within epsilon of each other.
+        '''
+        # We try to do this in an overflow-friendly way, though it
+        # probably isn't a big deal with our use cases and python.
+        return a - epsilon <= b if a > b else b - epsilon <= a
+
+    @staticmethod
+    def normalize_list(nums, min_score=MIN_SCORE):
+        '''
+        Normalizes list of floats to a valid probability distribution.
+
+        Args:
+            nums ([float]):
+            min_score (float, optional): The lowest score to boost
+                objects to (all objects are boosted uniformly). Defaults
+                to MIN_SCORE.
+
+        Returns:
+            [float]
+        '''
+        # First, boost all to some minimum value.
+        min_ = min(nums)
+        boost = MIN_SCORE - min_ if MIN_SCORE > min_ else 0.0
+        nums = [n + boost for n in nums]
+
+        # Next, do the normalization.
+        sum_ = sum(nums)
+        return [n / sum_ for n in nums]
+
+    @staticmethod
+    def normalize(objs, attr='score', min_score=MIN_SCORE):
+        '''
+        Normalizes list of objects with a attr attribute (that is a
+        float) to a valid probability distribution.
+
+        Args:
+            objs ([Object]): List of Objects
+            attr (str, optional): The name of the attribute to extract
+                from objects. Defaults to 'score'.
             min_score (float, optional): The lowest score to boost
                 objects to (all objects are boosted uniformly). Defaults
                 to MIN_SCORE.
         '''
-        # First, boost all to some minimum value.
-        min_ = min([o.score for o in objs])
-        boost = MIN_SCORE - min_ if MIN_SCORE > min_ else 0.0
-        for o in objs:
-            o.score = o.score + boost
-
-        # Next, do the normalization.
-        sum_ = sum([o.score for o in objs])
-        for o in objs:
-            o.score = o.score / sum_
+        nums = [getattr(obj, attr) for obj in objs]
+        nums = Util.normalize_list(nums, min_score)
+        for i in range(len(objs)):
+            setattr(objs[i], attr, nums[i])
 
 
 class CommandDict:
@@ -323,6 +392,8 @@ class CommandTemplate:
 class Command:
     '''A fully-instantiated command.
 
+    Here's the process:
+
     Has state: YES
     '''
 
@@ -330,13 +401,24 @@ class Command:
         '''
         Args:
             name (str)
-            option_map ([{str: Option}])
+            option_map ({str: Option})
             template (CommandTemplate)
         '''
         self.name = name
         self.option_map = option_map
         self.template = template
+
+        # P(C|W,R)
         self.score = START_SCORE
+
+        # P(L|C)
+        self.sentence_match_probs = {}
+
+        # P(L|C) * P(L) (marginalize across L)
+        self.lang_score = 0.0
+
+        # P(C|W,R) * P(L|W,R,C)
+        self.final_p = 0.0
 
     def __repr__(self):
         '''
@@ -344,13 +426,66 @@ class Command:
             str
         '''
         lnl = CommandDict.longest_cmd_name_len
-        score_str = "%0.4f" % (self.score)
+        score_str = "score: %0.7f" % (self.score)
+        if self.lang_score != 0.0:
+            score_str += ", lang_score: %0.7f" % (self.lang_score)
+        if self.final_p != 0.0:
+            score_str += ", final_p: %0.7f" % (self.final_p)
         padding = 0 if len(self.name) == lnl else lnl - len(self.name)
         name_str = self.name + ' ' * padding
         opt_str = ', '.join(
             [': '.join(
                 [str(k), str(v)]) for k, v in self.option_map.iteritems()])
         return "%s   %s   %s" % (score_str, name_str, opt_str)
+
+    @staticmethod
+    def apply_l_precheck(commands, sentences):
+        '''
+        Checks that numbers are sane. Should be called before apply_l
+        (not enforced).
+
+        This does nothing if DEBUG is False.
+
+        Args:
+            commands ([Command])
+            sentences ([Sentence])
+        '''
+        if not DEBUG:
+            return
+
+        # Ensure command scores are normalized.
+        sum_ = sum(c.score for c in commands)
+        if not Util.are_floats_close(sum_, 1.0):
+            Error.p('Command scores are not normed: %0.3f' % (sum_))
+            sys.exit(1)
+
+        # Ensure sentence scores normalized.
+        sum_ = sum(s.score for s in sentences)
+        if not Util.are_floats_close(sum_, 1.0):
+            Error.p('Sentence scores are not normed: %0.3f' % (sum_))
+            sys.exit(1)
+
+        # Check a few things for all commands.
+        for c in commands:
+            # Quick check whether sentence_match_probs reasonable.
+            if len(c.sentence_match_probs) != len(sentences):
+                Error.p('Must score_match_sentences before apply_l.')
+                sys.exit(1)
+
+            # Ensure all sentences pre-matched with this command.
+            for s in sentences:
+                if s not in c.sentence_match_probs.keys():
+                    Error.p(
+                        ('Command %s sentence_match_probs missing ' +
+                            'sentence: %s') % (str(c), str(s)))
+                    sys.exit(1)
+
+            # Ensure sentence match scores normalized.
+            sum_ = sum(p for s, p in c.sentence_match_probs.iteritems())
+            if not Util.are_floats_close(sum_, 1.0):
+                Error.p(
+                    'Command sentence_match_probs not normed: %0.3f' % (sum_))
+                sys.exit(1)
 
     @staticmethod
     def _gen_phrases(todo, results=[]):
@@ -399,6 +534,16 @@ class Command:
         return [
             opt.get_wobj() for pname, opt in self.option_map.iteritems()
             if isinstance(opt, ObjectOption)]
+
+    def get_phrase_sets(self):
+        '''
+        Returns:
+            [[Phrase]]: The length is the number of options this command
+                has, and each element is a list that contains all of
+                that options' commands.
+        '''
+        return [
+            opt.get_phrases() for pname, opt in self.option_map.iteritems()]
 
     def apply_w(self):
         '''
@@ -497,6 +642,86 @@ class Command:
             loc_reachable = robot[robot_prop][side_idx]
             if not loc_reachable:
                 self.score += P_LOCUNR
+
+    def score_match_sentences(self, sentences):
+        '''
+        Score how well a command matches with sentences.
+
+        This can be done in advance of actually receiving an utterance.
+        The result is stored in self.sentence_match_probs
+
+        Args:
+            sentences ([Sentence])
+        '''
+        Debug.p('Sentence-matching command: ' + str(self))
+        # Empty list before we start adding to it.
+        if len(self.sentence_match_probs) != 0:
+            self.sentence_match_probs = {}
+
+        scores = []
+        phrase_sets = self.get_phrase_sets()
+        for sentence in sentences:
+            score = START_SCORE
+            s_phrases = sentence.get_phrases()
+
+            # We simply count the phrase matches. We want to penalize
+            # missing phrases in either direction, so we just check both
+            # ways (double-scoring matches). Also note we match on the
+            # command side per option (set of phrases).
+
+            # Check whether any phrase for each command option in
+            # sentence phrases.
+            for phrase_set in phrase_sets:
+                phrase_match = False
+                for phrase in phrase_set:
+                    if phrase in s_phrases:
+                        phrase_match = True
+                if phrase_match:
+                    score += CMD_PHRASE_MATCH_SCORE
+                else:
+                    score += CMD_PHRASE_UNMATCH_SCORE
+
+            # Check each phrase in the sentence's phrases.
+            for s_phrase in s_phrases:
+                phrase_match = False
+                for phrase_set in phrase_sets:
+                    if s_phrase in phrase_set:
+                        phrase_match = True
+                if phrase_match:
+                    score += CMD_PHRASE_MATCH_SCORE
+                else:
+                    score += CMD_PHRASE_UNMATCH_SCORE
+
+            scores += [score]
+            Debug.pl(1, '%0.2f %s' % (score, str(sentence)))
+
+        # Normalize, save
+        scores = Util.normalize_list(scores)
+        for idx, sentence in enumerate(sentences):
+            self.sentence_match_probs[sentence] = scores[idx]
+
+    def apply_l(self, sentences):
+        '''
+        Applies utterance-scored sentences to command-matched score.
+
+        Must first call score_match_sentences(...).
+
+        Args:
+            sentences ([Sentence])
+        '''
+        score_total = 0.0
+        for s in sentences:
+            score_total += s.score * self.sentence_match_probs[s]
+        self.lang_score = score_total
+
+    def get_final_p(self):
+        '''
+        Calculates final probability of command by combining P(C|W,R)
+        and P(L|W,R).
+
+        The result is stored in self.final_p.
+        '''
+        self.final_p = self.score * self.lang_score
 
 
 class Parameter:
@@ -603,6 +828,13 @@ class Sentence:
         phrases = ' '.join(["'" + str(p) + "'" for p in self.phrases])
         return "%0.4f  %s" % (self.score, phrases)
 
+    def get_phrases(self):
+        '''
+        Returns:
+            [Phrase]
+        '''
+        return self.phrases
+
     def score_match(self, utterance):
         '''
         Args:
@@ -663,14 +895,6 @@ class Phrase:
             bool
         '''
         return self.words != other.words
-
-    # def get_words(self):
-    #     '''Returns the phrase's words.
-
-    #     Returns:
-    #         str
-    #     '''
-    #     return self.words
 
 
 class MatchingStrategy:
@@ -794,6 +1018,9 @@ class WorldObject:
 ########################################################################
 
 def main():
+    # Display settings.
+    display_limit = 20
+
     # Load
     command_dict = CommandDict(yaml.load(open(COMMAND_GRAMMAR)))
 
@@ -802,12 +1029,14 @@ def main():
     robot_dict = world_dict['robot']
     # w_objects = []  # For testing no objects.
 
+    # Make templates (this extracts options and params).
     templates = command_dict.make_templates(w_objects)
     Debug.p('Templates:')
     for t in templates:
         Debug.pl(1, t)
     Info.p("Templates: " + str(len(templates)))
 
+    # Make commands
     commands = [ct.generate_commands() for ct in templates]
     commands = [i for s in commands for i in s]  # Flatten.
     Info.p("Commands: " + str(len(commands)))
@@ -817,32 +1046,62 @@ def main():
     sentences = [i for s in sentences for i in s]  # Flatten.
     Info.p("Sentences: " + str(len(sentences)))
 
-    # Do scoring
+    # Apply W and R to weight C prior.
     for c in commands:
         c.apply_w()
         c.apply_r(robot_dict)
     Util.normalize(commands)
-    commands = sorted(commands, key=lambda x: -x.score)
 
-    ptot = 0.0
-    Debug.p("Commands:")
+    # Pre-score commands with all possible sentences.
     for c in commands:
-        Debug.pl(1, c)
-        ptot += c.score
-    Debug.p('Total (%d): %0.2f' % (len(commands), ptot))
+        c.score_match_sentences(sentences)
 
-    # TODO: Pre-score commands with all possible sentences.
+    # Display commands.
+    commands = sorted(commands, key=lambda x: -x.score)
+    ptot = 0.0
+    Info.p("Top commands (before utterance):")
+    for idx, c in enumerate(commands):
+        if idx < display_limit:
+            Info.pl(1, c)
+        ptot += c.score
+    Info.p('Total (%d): %0.2f' % (len(commands), ptot))
 
     # Get user input here (normally).
-    utterance = 'pick up obj0'
+    utterance = 'move right hand up'
+    Info.p("Utterance: " + utterance)
 
+    # Score sentences.
     for s in sentences:
         s.score_match(utterance)
     Util.normalize(sentences)
+
+    # Apply L.
+    Command.apply_l_precheck(commands, sentences)
+    for c in commands:
+        c.apply_l(sentences)
+    Util.normalize(commands, 'lang_score', 0.0)
+
+    # Get combined probability.
+    for c in commands:
+        c.get_final_p()
+    Util.normalize(commands, 'final_p', 0.0)
+
+    # Display sentences.
     sentences = sorted(sentences, key=lambda x: -x.score)
-    Debug.p('Sentences:')
-    for s in sentences:
-        Debug.pl(1, s)
+    Info.p('Top sentences:')
+    for idx, s in enumerate(sentences):
+        if idx < display_limit:
+            Info.pl(1, s)
+
+    # Display commands.
+    commands = sorted(commands, key=lambda x: -x.final_p)
+    ptot = 0.0
+    Info.p("Top commands:")
+    for idx, c in enumerate(commands):
+        if idx < display_limit:
+            Info.pl(1, c)
+        ptot += c.final_p
+    Info.p('Total (%d): %0.2f' % (len(commands), ptot))
 
 if __name__ == '__main__':
     main()
