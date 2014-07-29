@@ -1,26 +1,53 @@
+# commands -> parameters
+# There are the "functional" specification of the commands.
 commands:
     move_rel:
+        - move_rel
         - relpos
         - obj
         - side
     move_abs:
+        - move_abs
         - absdir
         - side
     pickup:
+        - pickup
         - obj
         - side
     place:
+        - place
         - relpos
         - obj
         - side
     lookat:
+        - lookat
         - obj
     open:
+        - open
         - side
     close:
+        - close
         - side
     save:
-options:
+        - save
+
+# parameters -> options
+# These specify the options for the parameters of the command
+# components. If a parameter isn't listed here, it has only one option,
+# or the options need to be filled in via other methods (e.g. world
+# state).
+#
+# For example, we assume all parameters above that aren't listed here
+# are self-mapping to options. That is, assume there are entires for
+# all of them that go:
+#
+#     move_rel:
+#         - move_rel
+#     move_abs:
+#         - move_abs
+#
+# etc.
+parameters:
     relpos:
         - above
         - nextto
@@ -29,9 +56,71 @@ options:
         - down
         - toleft
         - toright
-# obj is a special case; it's expanded by the objects available to the
-# system.
-    obj:
     side:
         - right
         - left
+
+# options -> phrases
+# These are the spoken utterance options for all commands and options.
+options:
+    move_rel:
+        phrases:
+            - move
+    move_abs:
+        phrases:
+            - move
+    pickup:
+        phrases:
+            - pick up
+            - grab
+    place:
+        phrases:
+            - place
+            - put
+    lookat:
+        phrases:
+            - look at
+            - look
+            - turn your head
+    open:
+        phrases:
+            - open
+            - release
+    close:
+        phrases:
+            - close
+    save:
+        phrases:
+            - save
+    above:
+        phrases:
+            - above
+    nextto:
+        phrases:
+            - next to
+    up:
+        phrases:
+            - up
+            - higher
+    down:
+        phrases:
+            - down
+            - lower
+    toleft:
+        phrases:
+            - to the left
+            - left
+        strategy: notside
+    toright:
+        phrases:
+            - to the right
+            - right
+        strategy: notside
+    right:
+        phrases:
+            - right hand
+            - right arm
+    left:
+        phrases:
+            - left hand
+            - left arm

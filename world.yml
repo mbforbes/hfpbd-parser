@@ -16,6 +16,7 @@ objects:
         # E.g. cup, box, unknown
         type: box
         has_distinct_type: false
+    # -   name: obj1
 robot:
     # open, closed_empty, has_obj
     gripper_states: [closed_empty, closed_empty]

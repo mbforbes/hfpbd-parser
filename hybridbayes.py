@@ -6,6 +6,7 @@
 
 # Builtins
 import code
+from collections import OrderedDict
 import copy
 import pprint
 import sys
@@ -18,12 +19,11 @@ import yaml
 # Global options
 ERROR_PRINTING_DEFAULT = True
 INFO_PRINTING_DEFAULT = True
-DEBUG_PRINTING_DEFAULT = False
+DEBUG_PRINTING_DEFAULT = True
 
 COMMAND_GRAMMAR = 'commands.yml'
 WORLD = 'world.yml'
-VOCAB = 'vocab.yml'
-OBJ_COMPONENT = 'obj'  # We expand this component by name.
+OBJ_PARAM = 'obj'
 
 # How to index into object properties by side
 S = {'right': 0, 'left': 1}
@@ -42,15 +42,18 @@ M_RP = {
     'toright': 'can_move_toright',
 }
 
-# Score-related
+# Command score
 START_SCORE = 0.0  # To begin with. Maybe doesn't matter.
 MIN_SCORE = 10.0  # Minimum score for normalizing. Only adds to match.
-P_NOOBJ = -80  # Penalty: there's no object and the score requires one.
 P_LOCUNR = -50  # Penalty: the requested location is unreachable.
 P_OBJUNR = -50  # Penalty: the requested object cannot be picked up.
 P_NOTLASTSIDE = -10  # Penalty: the side wasn't the last commanded.
 P_GSTATE = -80  # Penalty: nonsensical gripper state change requested.
 P_BADPP = -50  # Penalty: bad pickup/place command requested (from GS)
+
+# Language score
+LANG_MATCH_SCORE = 90
+LANG_UNMATCH_SCORE = 10
 
 
 ########################################################################
@@ -96,307 +99,544 @@ class Debug(Logger):
     prefix = '[DEBUG]'
 
 
+class CommandDict:
+    '''The Python representation of our YAML-defined commands file.'''
 
+    longest_cmd_name_len = 0
+
+    def __init__(self, ydict):
+        '''
+        Args:
+            ydict (dict): YAML-loaded dictionary.
+        '''
+        self.ydict = ydict
+        CommandDict.longest_cmd_name_len = max(
+            [len(cmd) for cmd, params in self.ydict['commands'].iteritems()])
+
+    def make_templates(self, wobjs):
+        '''
+        Args:
+            wobjs ([WorldObject]): The object we see in the world (or
+                from a YAML file).
+
+        Returns:
+            [CommandTemplate]
+        '''
+        options = self._make_options(wobjs)
+        parameters = self._make_parameters(options)
+        templates = []
+        for cmd, pnames in self.ydict['commands'].iteritems():
+            params = []
+            for pname in pnames:
+                # We omit parameters that don't exist (like objects in
+                # the world), so check for this here.
+                if pname in parameters:
+                    params += [parameters[pname]]
+                else:
+                    break
+
+            # If any parameters were missing, don't add.
+            if len(params) == len(pnames):
+                templates += [CommandTemplate(cmd, params)]
+
+        Debug.p('Templates:')
+        for t in templates:
+            Debug.p(t)
+        return templates
+
+    def _make_parameters(self, options):
+        '''
+        Args:
+            options ({str: Option})
+
+        Returns:
+            {str: Parameter}
+        '''
+        params = {}
+
+        # First, find all possible parameter names.
+        param_set = set()
+        for cmd, pnames in self.ydict['commands'].iteritems():
+            for pname in pnames:
+                param_set.add(pname)
+
+        # Then, make a complete mapping of them.
+        pdict = self.ydict['parameters']
+        for pname in list(param_set):
+            if pname == OBJ_PARAM:
+                opts = [
+                    opt for name, opt in options.iteritems()
+                    if isinstance(opt, ObjectOption)]
+                # Filter out parameter if no objects.
+                if len(opts) == 0:
+                    continue
+            elif pname in pdict:
+                # We have an actual entry, which means the parameter has
+                # multiple options.
+                opt_names = pdict[pname]
+                opts = [options[opt_name] for opt_name in opt_names]
+            else:
+                # No entry; assume 1:1 mappingto opt_name. This errors
+                # if there wasn't an option mapping, which is good.
+                opts = [options[pname]]
+            params[pname] = Parameter(pname, opts)
+
+        Debug.p('Params: ' + str(params.values()))
+        return params
+
+    def _make_options(self, wobjs):
+        '''
+        Args:
+            wobjs ([WorldObject]): The object we see in the world (or
+                from a YAML file).
+
+        Returns:
+            {str: Option}
+        '''
+        # Make object options first.
+        options = {}
+        for wobj in wobjs:
+            options[wobj.properties['name']] = ObjectOption(wobj)
+
+        # Go bottom-up.
+        matcher = DefaultMatcher
+        for opt_name, props in self.ydict['options'].iteritems():
+            # Get strategy, if special
+            if 'strategy' in props:
+                matcher = props['strategy']
+
+            # Get phrases
+            raw_phrases = props['phrases']
+            phrases = [Phrase(phrase, matcher) for phrase in raw_phrases]
+
+            # Make our word option and add it.
+            w_opt = WordOption(opt_name, phrases)
+            options[opt_name] = w_opt
+
+        Debug.p('Options: ' + str(options.values()))
+        return options
+
+
+class CommandTemplate:
+    '''An uninstantiated command.'''
+
+    def __init__(self, name, params):
+        '''
+        Args:
+            name (str)
+            params ([Parameter])
+        '''
+
+        self.name = name
+        self.params = params
+
+    def __repr__(self):
+        arr = ['<<' + self.name + '>>:'] + [str(p) for p in self.params]
+        return ' '.join(arr)
+
+    def generate_commands(self):
+        '''Generates all possible commands specified by this template.
+
+        Simply enumerates all possible options for all parameters.
+
+        Returns:
+            [Command]
+        '''
+        param_copy = copy.deepcopy(self.params)
+        opt_maps = CommandTemplate._gen_opts(param_copy)
+        return [Command(self.name, om, self) for om in opt_maps]
+
+    def has_params(self, pnames):
+        '''
+        Returns whether this template has ALL parameters specified by
+        name in pnames.
+
+        Args:
+            pnames ([str])
+
+        Returns:
+            bool
+        '''
+        pnames = list(set(pnames))  # Avoid duplicate problems
+        for param in self.params:
+            if param.name in pnames:
+                pnames.remove(param.name)
+        return len(pnames) == 0
+
+    @staticmethod
+    def _gen_opts(todo, results=[]):
+        '''
+        Args:
+            todo [Parameter]
+            results ([{str: Option}])
+
+        Returns:
+            [{str: Option}]
+        '''
+        if len(todo) == 0:
+            return results
+        param = todo.pop(0)
+        next_opts = param.get_options()
+        # Debug.p("Processing options: " + str(next_opts))
+        if results == []:
+            new_results = []
+            for opt in next_opts:
+                entry = OrderedDict()
+                entry[param.name] = opt
+                new_results += [entry]
+        else:
+            new_results = []
+            for opt in next_opts:
+                for r in results:
+                    newr = copy.copy(r)
+                    newr[param.name] = opt
+                    new_results += [newr]
+        return CommandTemplate._gen_opts(todo, new_results)
 
 
 class Command:
     '''A fully-instantiated command.
 
-    It starts as a shell when initialized, but adding to self.params
-    causes the command to become fully-instantiated.
+    Has state: YES
     '''
 
-    longest_name_len = 0
-
-    def __init__(self, name):
+    def __init__(self, name, option_map, template):
         '''
         Args:
             name (str)
+            option_map ([{str: Option}])
+            template (CommandTemplate)
         '''
         self.name = name
-        self.params = {}
+        self.option_map = option_map
+        self.template = template
         self.score = START_SCORE
 
-        # Track longest name for uniform logging
-        l = len(self.name)
-        pl = Command.longest_name_len
-        Command.longest_name_len = l if l > pl else pl
-
-    def __str__(self):
-        lnl = Command.longest_name_len
+    def __repr__(self):
+        '''
+        Returns:
+            str
+        '''
+        lnl = CommandDict.longest_cmd_name_len
         score_str = "%0.3f" % (self.score)
         padding = 0 if len(self.name) == lnl else lnl - len(self.name)
         name_str = self.name + ' ' * padding
-        param_str = ', '.join(
-            [': '.join([str(k), str(v)]) for k, v in self.params.iteritems()])
-        return "%s   %s   %s" % (score_str, name_str, param_str)
+        opt_str = ', '.join(
+            [': '.join(
+                [str(k), str(v)]) for k, v in self.option_map.iteritems()])
+        return "%s   %s   %s" % (score_str, name_str, opt_str)
 
+    @staticmethod
+    def normalize(commands):
+        '''
+        Normalizes command scores to a valid probability distribution.
 
-########################################################################
-# Functions
-########################################################################
+        Args:
+            commands ([Command])
+        '''
+        # First, boost all to some minimum value.
+        min_ = min([c.score for c in commands])
+        boost = MIN_SCORE - min_ if MIN_SCORE > min_ else 0.0
+        for c in commands:
+            c.score = c.score + boost
 
-def generate_all_commands(commands, objects={}):
-    '''
-    Args:
-        commands (dict): YAML-loaded
-        objects (dict)
+        # Next, do the normalization.
+        sum_ = sum([c.score for c in commands])
+        for c in commands:
+            c.score = c.score / sum_
 
-    Returns:
-        [Command]: Commands
-    '''
-    # Pre-extract object options.
-    objs = [o['name'] for o in objects]
-    objs = [None] if len(objs) == 0 else objs
+    def has_obj_opt(self):
+        '''
+        Returns:
+            bool
+        '''
+        return len(self.get_objs()) > 0
 
-    # Now, generate commands.
-    all_results = []
-    for cmd, components in commands['commands'].iteritems():
-        Debug.p(cmd)
-        cmd_results = [Command(cmd)]
-        # Sometimes there are no parameters to expand.
-        if components is not None:
-            # Otherwise, expand all components.
-            for component in components:
-                Debug.pl(1, component)
-                # All options must be appended separately.
-                next_cmd_results = []
-                if component == OBJ_COMPONENT:
-                    options = objs
-                else:
-                    options = commands['options'][component]
-                for opt in options:
-                    Debug.pl(2, opt)
-                    for prev_cmd in cmd_results:
-                        new_cmd = copy.deepcopy(prev_cmd)
-                        new_cmd.params[component] = opt
-                        next_cmd_results += [new_cmd]
+    def get_objs(self):
+        '''
+        Returns:
+            [WorldObject]
+        '''
+        return [
+            opt.get_wobj() for pname, opt in self.option_map.iteritems()
+            if isinstance(opt, ObjectOption)]
 
-                # Append on the results of this component expansion.
-                cmd_results = next_cmd_results
-        # Append on this command
-        # += [cmd_results] groups list by command; could be useful...
-        all_results += cmd_results
-    # Display
-    Debug.p('number of commands: ' + len(all_results))
-    return all_results
+    def apply_w(self):
+        '''
+        Applies world (objects) influence to command scores.
 
+        Negatively affect commands that contain objects referring to
+        'impossible configurations.'
 
-def c_apply_w(commands, objects):
-    '''
-    Applies world (objects) influence to command scores.
+        - lookat: obj exist?
+        - move_rel: move obj to relpos w/ side possible?
+        - place_rel: same as move_rel
+        - pickup: pickup obj w/ side possible?
+        '''
+        if not self.has_obj_opt():
+            return
 
-    Negatively affect commands that contain objects referring to
-    'impossible configurations.'
+        # Currently, there should be exactly one object per command.
+        wobj = self.get_objs()[0]
 
-    - lookat: obj exist?
-    - move_rel: move obj to relpos w/ side possible?
-    - place_rel: same as move_rel
-    - pickup: pickup obj w/ side possible?
-
-    Args:
-        commands ([Command])
-        objects (dict)
-    '''
-    for c in commands:
-        # lookat: check object existing
-        if c.name == 'lookat':
-            if len(objects) == 0:
-                # No objs: receive that negative score.
-                c.score += P_NOOBJ
-
-        # move_rel, place: check relpos, obj, side
-        if c.name == 'move_rel' or c.name == 'place':
-            if len(objects) == 0:
-                # No objs: receive that negative score.
-                c.score += P_NOOBJ
+        # We'll filter by name, as template sets will be brittle.
+        # cmds: move_rel, place (params: relpos, side)
+        if self.name in ['move_rel', 'place']:
+            relpos = self.option_map['relpos'].name
+            side = self.option_map['side'].name
+            reachables = wobj.properties[M_OP[relpos]]
+            if side in ['right', 'left']:
+                loc_reachable = reachables[S[side]]
             else:
-                # Assuming object names are unique, there should be
-                # exactly one.
-                obj = [o for o in objects if o['name'] == c.params['obj']][0]
-                relpos = c.params['relpos']
-                side = c.params['side']
-                loc_reachable = obj[M_OP[relpos]][S[side]]
-                if not loc_reachable:
-                    c.score += P_LOCUNR
+                # Side == both
+                loc_reachable = reachables[0] and reachables[1]
+            if not loc_reachable:
+                self.score += P_LOCUNR
 
-        # pickup: check obj, side
-        if c.name == 'pickup':
-            if len(objects) == 0:
-                # No objs: receive that negative score.
-                c.score += P_NOOBJ
+        # cmds: pickup (params: side)
+        if self.name in ['pickup']:
+            side = self.option_map['side'].name
+            reachables = wobj.properties['is_pickupable']
+            if side in ['right', 'left']:
+                loc_reachable = reachables[S[side]]
             else:
-                # Assuming object names are unique, there should be
-                # exactly one.
-                obj = [o for o in objects if o['name'] == c.params['obj']][0]
-                side = c.params['side']
-                loc_reachable = obj['is_pickupable'][S[side]]
-                if not loc_reachable:
-                    c.score += P_OBJUNR
+                # Side == both
+                loc_reachable = reachables[0] and reachables[1]
+            if not loc_reachable:
+                self.score += P_OBJUNR
 
+    def apply_r(self, robot):
+        '''
+        Applies robot (state) influence to command scores.
 
-def c_apply_r(commands, robot):
-    '''
-    Applies robot (state) influence to command scores.
+        Negatively affect commands that contain nonsensical operations
+        (like open right hand with right hand open) or non-last-referred
+        side commands (like move right hand when left hand last moved).
 
-    Negatively affect commands that contain nonsensical operations
-    (like open right hand with right hand open) or non-last-referred
-    side commands (like move right hand when left hand last moved).
+        - all side: last commanded? (less linkely down)
+        - all open/close: based on state (impossible down)
+        - all pickup/place: based on state (impossible down)
+        - move_abs: absdir possible to move to
 
-    - all side: last commanded? (less linkely down)
-    - all open/close: based on state (impossible down)
-    - all pickup/place: based on state (impossible down)
-    - move_abs: absdir possible to move to
-
-    Args:
-        commands ([Command])
-        robot (dict)
-    '''
-    for c in commands:
-        pks = c.params.keys()
+        Args:
+            commands ([Command])
+            robot (dict)
+        '''
+        cmd_side = (
+            self.option_map['side'].name
+            if 'side' in self.option_map else None)
+        side_idx = S[cmd_side] if cmd_side is not None else None
 
         # Side: last moved? Less likely down.
-        if 'side' in pks:
+        if self.template.has_params(['side']):
             last_cmd_side = robot['last_cmd_side']
             if (last_cmd_side != 'neither' and
-                    c.params['side'] != last_cmd_side):
-                c.score += P_NOTLASTSIDE
+                    self.option_map['side'].name != last_cmd_side):
+                self.score += P_NOTLASTSIDE
 
         # Open/closed & pickup/place: Basd on state (impossible down).
-        if c.name == 'open':
-            gs = robot['gripper_states'][S[c.params['side']]]
+        if self.name == 'open':
+            gs = robot['gripper_states'][side_idx]
             if gs == 'open':
                 c.score += P_GSTATE
-        if c.name == 'close':
-            gs = robot['gripper_states'][S[c.params['side']]]
+        if self.name == 'close':
+            gs = robot['gripper_states'][side_idx]
             if gs == 'closed_empty' or gs == 'has_obj':
-                c.score += P_GSTATE
-        if c.name == 'pickup':
-            gs = robot['gripper_states'][S[c.params['side']]]
+                self.score += P_GSTATE
+        if self.name == 'pickup':
+            gs = robot['gripper_states'][side_idx]
             if gs == 'has_obj':
-                c.score += P_BADPP
-        if c.name == 'place':
-            gs = robot['gripper_states'][S[c.params['side']]]
+                self.score += P_BADPP
+        if self.name == 'place':
+            gs = robot['gripper_states'][side_idx]
             if gs == 'open' or gs == 'closed_empty':
-                c.score += P_BADPP
+                self.score += P_BADPP
 
         # move_abs: absdir possible to move to
-        if c.name == 'move_abs':
-            side = c.params['side']
-            loc_reachable = robot[M_RP[c.params['absdir']]][S[side]]
+        if self.name == 'move_abs':
+            robot_prop = M_RP[self.option_map['absdir'].name]
+            loc_reachable = robot[robot_prop][side_idx]
             if not loc_reachable:
-                c.score += P_LOCUNR
+                self.score += P_LOCUNR
 
 
-def generate_all_sentences(commands, objects={}):
-    '''
-    Args:
-        commands ([Command])
-        vocab (dict): YAML-loaded
+class Parameter:
+    '''A class that holds parameter info, including possible options.'''
 
-    Returns:
-        [Sentence]
-    '''
-    pass
+    def __init__(self, name, options):
+        self.name = name
+        self.options = options
 
+    def get_options(self):
+        return self.options
 
-def l_apply_w(sentences, objects):
-    '''
-    Applies world (objects) influence to language scores.
-
-    Args:
-        sentences ([Sentence])
-        objects (dict)
-    '''
-    pass
+    def __repr__(self):
+        '''
+        Returns:
+            str
+        '''
+        return ''.join(['<', self.name, '>'])
 
 
-def normalize(commands):
-    '''
-    Normalizes command scores to a valid probability distribution.
+class Option:
+    '''Interface for options.'''
 
-    Args:
-        commands ([Command])
-    '''
-    # First, boost all to some minimum value.
-    min_ = min([c.score for c in commands])
-    boost = MIN_SCORE - min_ if MIN_SCORE > min_ else 0.0
-    for c in commands:
-        c.score = c.score + boost
-
-    # Next, do the normalization.
-    sum_ = sum([c.score for c in commands])
-    for c in commands:
-        c.score = c.score / sum_
-
-
-def score(commands_dict, objects, robot):
-    '''
-    Args:
-        commands_dict (dict): Direct, YAML-loaded commands dictionary.
-        objects (dict): objects map (e.g. in world YAML file)
-        robot (dict): robot map (e.g. in world YAML file)
-
-    Returns:
-        Command: top-scoring command
-    '''
-    commands = generate_all_commands(commands_dict, objects)
-
-    # Calc P(C|W,R)
-    c_apply_w(commands, objects)
-    c_apply_r(commands, robot)
-    normalize(commands)
-
-    # Calc P(L|W,R,C)
-    # TODO: all this
-
-    # Display: highest first (hence - score comparison)
-    commands = sorted(commands, key=lambda x: -x.score)
-    for c in commands:
-        print c
-    print '-- Total:', sum([c.score for c in commands])
-    return commands[0]
-
-
-def check_vocab(vocab_dict, commands_dict):
-    '''
-    Ensures vocab entires are comprehensive of commands_dict entries.
-
-    Both sets of commands should match exactly.
-
-    The components of vocab should be a superset of the components of
-    commands.
-
-    Args:
-        commands_dict (dict): Direct, YAML-loaded commands dictionary.
-        vocab_dict (dict): Direct, YAML-loaded vocab dictionary.
-
-    '''
-    failed = False
-    # Check all in vocab are in commands.
-    for cmd, components in vocab_dict['vocab']['commands'].iteritems():
-        if cmd not in commands_dict['commands']:
-            failed = True
-            Error.p('Command ' + cmd + ' not in commands dict.')
-
-    # Check commands AND components in commands are in vocab.
-    for cmd, components in commands_dict['commands'].iteritems():
-        if cmd not in vocab_dict['vocab']['commands']:
-            failed = True
-            Error.p('Command ' + cmd + ' not in vocab dict.')
-        else:
-            # We have the command; make sure all components in commands
-            # are in vocab.
-            for component in components:
-                if component not in vocab_dict['vocab']['commands'][cmd]:
-                    failed = True
-                    Error.p(
-                        'Component ' + component + ' found in commands dict ' +
-                        cmd + ' but not in vocab dict.')
-
-    # We really want to make sure these match.
-    if failed:
+    def get_phrases(self):
+        Error.p("Option:get_phrases unimplemented as it's an interface.")
         sys.exit(1)
+
+    def __repr__(self):
+        '''
+        Returns:
+            str
+        '''
+        return ''.join(['|', self.name, '|'])
+
+
+class WordOption(Option):
+    '''Holds options info, including all possible referring phrases.'''
+
+    def __init__(self, name, phrases):
+        self.name = name
+        self.phrases = phrases
+
+
+class ObjectOption(Option):
+    '''Holds options info for object, so can generate all possible
+    referring phrases.'''
+
+    def __init__(self, world_obj):
+        '''
+        Args:
+            world_obj (WorldObject)
+        '''
+        # self.param_name = OBJ_PARAM
+        self.name = world_obj.properties['name']
+        self.world_obj = world_obj
+
+    def __repr__(self):
+        '''
+        Returns:
+            str
+        '''
+        return ''.join(['|', self.name, '|'])
+
+    def get_wobj(self):
+        '''
+        Returns:
+            WorldObject
+        '''
+        return self.world_obj
+
+
+class Sentence:
+    '''Our representation of a perfect 'utterance'.
+
+    A series of phrases.'''
+
+    def __init__(self, phrases):
+        self.phrases = phrases
+
+
+class Phrase:
+    '''Holds a set of words and a matching strategy for determining if
+    it is matched in an utterance.'''
+
+    def __init__(self, words, strategy):
+        self.words = words
+        self.strategy = strategy
+
+    def score(self, utterance):
+        '''
+        Args:
+            utterance (str)
+
+        Returns:
+            int
+        '''
+        if strategy.match(self.words, utterance):
+            return LANG_MATCH_SCORE
+        else:
+            return LANG_UNMATCH_SCORE
+
+    def __repr__(self):
+        '''
+        Returns:
+            str
+        '''
+        return self.words
+
+    def __eq__(self, other):
+        '''
+        Returns:
+            bool
+        '''
+        return self.words == other.words
+
+    def __ne__(self, other):
+        '''
+        Returns:
+            bool
+        '''
+        return self.words != other.words
+
+    # def get_words(self):
+    #     '''Returns the phrase's words.
+
+    #     Returns:
+    #         str
+    #     '''
+    #     return self.words
+
+
+class MatchingStrategy:
+    '''Interface for matching strategies.'''
+
+    @classmethod
+    def match(words, utterance):
+        Error.p("MatchingStrategy:match unimplemented as it's an interface.")
+        sys.exit(1)
+
+
+class DefaultMatcher:
+    '''Default matching strategy.'''
+
+    @classmethod
+    def match(words, utterance):
+        '''Returns whether words match an utterance.
+
+        Args:
+            words (str)
+            utterance (str)
+
+        Returns:
+            bool
+        '''
+        return words in utterance
+
+
+class WorldObject:
+    '''
+    Contains data about the properties of an object in the world.
+
+    Can be robot or YAML-loaded.
+    '''
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def from_yaml(objs):
+        '''
+        Args:
+            objs (dict): YAML-loaded 'objects' component of world dict.
+        '''
+        wobjs = []
+        for obj in objs:
+            wobj = WorldObject()
+            wobj.properties = obj
+            wobjs += [wobj]
+        return wobjs
 
 
 ########################################################################
@@ -405,21 +645,39 @@ def check_vocab(vocab_dict, commands_dict):
 
 def main():
     # Load
-    commands_dict = yaml.load(open(COMMAND_GRAMMAR))
+    command_dict = CommandDict(yaml.load(open(COMMAND_GRAMMAR)))
 
     world_dict = yaml.load(open(WORLD))
-    objects = world_dict['objects']
-    robot = world_dict['robot']
-    # objects = {}  # For testing no objects.
+    w_objects = WorldObject.from_yaml(world_dict['objects'])
+    robot_dict = world_dict['robot']
+    # w_objects = []  # For testing no objects.
 
-    vocab_dict = yaml.load(open(VOCAB))
+    templates = command_dict.make_templates(w_objects)
+    commands = [ct.generate_commands() for ct in templates]
+    commands = [i for s in commands for i in s]  # Flatten.
 
+    # Do scoring
+    for c in commands:
+        c.apply_w()
+        c.apply_r(robot_dict)
+    Command.normalize(commands)
+    commands = sorted(commands, key=lambda x: -x.score)
+
+    ptot = 0.0
+    for c in commands:
+        Debug.p(c)
+        ptot += c.score
+    Debug.p('Total (%d): %0.2f' % (len(commands), ptot))
+
+    # OLD
+    # ---
     # Check stuff
-    check_vocab(vocab_dict, commands_dict)
+    # check_vocab(commands_dict)
+    # generate_all_sentences(commands_dict)
 
     # Do stuff
     # code.interact(local=locals())
-    score(commands_dict, objects, robot)
+    # score(commands_dict, objects, robot)
 
 if __name__ == '__main__':
     main()
