@@ -3,13 +3,13 @@
 commands:
     move_rel:
         - move_rel
+        - side
         - relpos
         - obj
-        - side
     move_abs:
         - move_abs
-        - absdir
         - side
+        - absdir
     pickup:
         - pickup
         - obj

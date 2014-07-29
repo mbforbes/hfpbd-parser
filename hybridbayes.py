@@ -53,7 +53,7 @@ P_BADPP = -50  # Penalty: bad pickup/place command requested (from GS)
 
 # Language score
 LANG_MATCH_SCORE = 90
-LANG_UNMATCH_SCORE = 10
+LANG_UNMATCH_SCORE = -10
 
 
 ########################################################################
@@ -99,6 +99,35 @@ class Debug(Logger):
     prefix = '[DEBUG]'
 
 
+class Util:
+    '''
+    Misc. helper functionality.
+    '''
+
+    @staticmethod
+    def normalize(objs, min_score=MIN_SCORE):
+        '''
+        Normalizes objects with a score attribute to a valid probability
+        distribution.
+
+        Args:
+            objs ([Object]): Array of Objects with score attributes.
+            min_score (float, optional): The lowest score to boost
+                objects to (all objects are boosted uniformly). Defaults
+                to MIN_SCORE.
+        '''
+        # First, boost all to some minimum value.
+        min_ = min([o.score for o in objs])
+        boost = MIN_SCORE - min_ if MIN_SCORE > min_ else 0.0
+        for o in objs:
+            o.score = o.score + boost
+
+        # Next, do the normalization.
+        sum_ = sum([o.score for o in objs])
+        for o in objs:
+            o.score = o.score / sum_
+
+
 class CommandDict:
     '''The Python representation of our YAML-defined commands file.'''
 
@@ -138,10 +167,6 @@ class CommandDict:
             # If any parameters were missing, don't add.
             if len(params) == len(pnames):
                 templates += [CommandTemplate(cmd, params)]
-
-        Debug.p('Templates:')
-        for t in templates:
-            Debug.p(t)
         return templates
 
     def _make_parameters(self, options):
@@ -203,7 +228,8 @@ class CommandDict:
         for opt_name, props in self.ydict['options'].iteritems():
             # Get strategy, if special
             if 'strategy' in props:
-                matcher = props['strategy']
+                matcher_name = props['strategy']
+                matcher = Matchers.MATCHERS[matcher_name]
 
             # Get phrases
             raw_phrases = props['phrases']
@@ -242,7 +268,7 @@ class CommandTemplate:
         Returns:
             [Command]
         '''
-        param_copy = copy.deepcopy(self.params)
+        param_copy = self.params[:]  # Just copy all obj. references.
         opt_maps = CommandTemplate._gen_opts(param_copy)
         return [Command(self.name, om, self) for om in opt_maps]
 
@@ -318,7 +344,7 @@ class Command:
             str
         '''
         lnl = CommandDict.longest_cmd_name_len
-        score_str = "%0.3f" % (self.score)
+        score_str = "%0.4f" % (self.score)
         padding = 0 if len(self.name) == lnl else lnl - len(self.name)
         name_str = self.name + ' ' * padding
         opt_str = ', '.join(
@@ -327,23 +353,36 @@ class Command:
         return "%s   %s   %s" % (score_str, name_str, opt_str)
 
     @staticmethod
-    def normalize(commands):
+    def _gen_phrases(todo, results=[]):
         '''
-        Normalizes command scores to a valid probability distribution.
-
         Args:
-            commands ([Command])
-        '''
-        # First, boost all to some minimum value.
-        min_ = min([c.score for c in commands])
-        boost = MIN_SCORE - min_ if MIN_SCORE > min_ else 0.0
-        for c in commands:
-            c.score = c.score + boost
+            todo [Option]
+            results ([[Phrase]])
 
-        # Next, do the normalization.
-        sum_ = sum([c.score for c in commands])
-        for c in commands:
-            c.score = c.score / sum_
+        Returns:
+            [[Phrase]]
+        '''
+        if len(todo) == 0:
+            return results
+        opt = todo.pop(0)
+        next_phrases = opt.get_phrases()
+        if results == []:
+            new_results = [[p] for p in next_phrases]
+        else:
+            new_results = []
+            for phrase in next_phrases:
+                for r in results:
+                    new_results += [r + [phrase]]
+        return Command._gen_phrases(todo, new_results)
+
+    def generate_sentences(self):
+        '''
+        Returns:
+            [Sentence]
+        '''
+        opt_copy = self.option_map.values()[:]  # Just copy all refs.
+        phrase_lists = Command._gen_phrases(opt_copy)
+        return [Sentence(pl) for pl in phrase_lists]
 
     def has_obj_opt(self):
         '''
@@ -500,6 +539,8 @@ class WordOption(Option):
         self.name = name
         self.phrases = phrases
 
+    def get_phrases(self):
+        return self.phrases
 
 class ObjectOption(Option):
     '''Holds options info for object, so can generate all possible
@@ -528,21 +569,61 @@ class ObjectOption(Option):
         '''
         return self.world_obj
 
+    def get_phrases(self):
+        '''
+        Returns:
+            [Phrase]
+        '''
+        # TODO(mbforbes): Implement this fully using object properties.
+        return [Phrase(self.name, DefaultMatcher)]
 
 class Sentence:
     '''Our representation of a perfect 'utterance'.
 
-    A series of phrases.'''
+    A series of phrases.
+
+    Has state: YES
+    '''
 
     def __init__(self, phrases):
+        '''
+        Args:
+            phrases ([Phrase])
+        '''
         self.phrases = phrases
+        self.score = 0
 
+    def __repr__(self):
+        '''
+        Returns:
+            str
+        '''
+        phrases = ' '.join(["'" + str(p) + "'" for p in self.phrases])
+        return "%0.4f  %s" % (self.score, phrases)
+
+    def score_match(self, utterance):
+        '''
+        Args:
+            utterance (str)
+        '''
+        # Debug.pl(1, "Scoring sentence: " + str(self))
+        for phrase in self.phrases:
+            phrase_score = phrase.score(utterance)
+            # Debug.pl(
+                # 2,
+                # "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
+            self.score += phrase_score
 
 class Phrase:
     '''Holds a set of words and a matching strategy for determining if
     it is matched in an utterance.'''
 
     def __init__(self, words, strategy):
+        '''
+        Args:
+            words ([str])
+            strategy (MatchingStrategy)
+        '''
         self.words = words
         self.strategy = strategy
 
@@ -552,9 +633,9 @@ class Phrase:
             utterance (str)
 
         Returns:
-            int
+            float
         '''
-        if strategy.match(self.words, utterance):
+        if self.strategy.match(self.words, utterance):
             return LANG_MATCH_SCORE
         else:
             return LANG_UNMATCH_SCORE
@@ -592,7 +673,8 @@ class Phrase:
 class MatchingStrategy:
     '''Interface for matching strategies.'''
 
-    @classmethod
+
+    @staticmethod
     def match(words, utterance):
         Error.p("MatchingStrategy:match unimplemented as it's an interface.")
         sys.exit(1)
@@ -601,7 +683,7 @@ class MatchingStrategy:
 class DefaultMatcher:
     '''Default matching strategy.'''
 
-    @classmethod
+    @staticmethod
     def match(words, utterance):
         '''Returns whether words match an utterance.
 
@@ -613,6 +695,71 @@ class DefaultMatcher:
             bool
         '''
         return words in utterance
+
+
+class NotSideMatcher:
+    '''Matching strategy that avoids matching side utterances.'''
+
+    @staticmethod
+    def find_all(words, utterance):
+        '''
+        Finds all indexes of words in utterance.
+
+        Args:
+            words (str)
+            utterance (str)
+
+        Returns:
+            [int]: indexes
+        '''
+        indexes = []
+        start = 0
+        res = utterance.find(words, start)
+        while res > -1:
+            indexes += [res]
+            start = res + 1
+            res = utterance.find(words, start)
+        return indexes
+
+    @staticmethod
+    def match(words, utterance):
+        '''Returns whether words match an utterance, avoiding side
+        utterances.
+
+        Args:
+            words (str)
+            utterance (str)
+
+        Returns:
+            bool
+        '''
+        bad_follow_words = ['hand', 'arm']
+        # Get basic test out of the way.
+        if not words in utterance:
+            return False
+
+        # At this point, the words are in the utterance. Check whether
+        # we're really matching the phrase...
+        indexes = NotSideMatcher.find_all(words, utterance)
+
+        for index in indexes:
+            nextidx = index + len(words) + 1  # + 1 for space
+            # If the next word is 'hand' or 'arm', we've actually
+            # matched one of the side phrases.
+            if nextidx < len(utterance):
+                for bw in bad_follow_words:
+                    if utterance[nextidx:nextidx + len(bw)] == bw:
+                        return False
+
+        # OK!
+        return True
+
+class Matchers:
+    # Indexes into classes
+    MATCHERS = {
+        'default': DefaultMatcher,
+        'notside': NotSideMatcher
+    }
 
 
 class WorldObject:
@@ -653,21 +800,46 @@ def main():
     # w_objects = []  # For testing no objects.
 
     templates = command_dict.make_templates(w_objects)
+    Debug.p('Templates:')
+    for t in templates:
+        Debug.pl(1, t)
+    Info.p("Templates: " + str(len(templates)))
+
     commands = [ct.generate_commands() for ct in templates]
     commands = [i for s in commands for i in s]  # Flatten.
+    Info.p("Commands: " + str(len(commands)))
+
+    # Make sentences
+    sentences = [c.generate_sentences() for c in commands]
+    sentences = [i for s in sentences for i in s]  # Flatten.
+    Info.p("Sentences: " + str(len(sentences)))
 
     # Do scoring
     for c in commands:
         c.apply_w()
         c.apply_r(robot_dict)
-    Command.normalize(commands)
+    Util.normalize(commands)
     commands = sorted(commands, key=lambda x: -x.score)
 
     ptot = 0.0
+    Debug.p("Commands:")
     for c in commands:
-        Debug.p(c)
+        Debug.pl(1, c)
         ptot += c.score
     Debug.p('Total (%d): %0.2f' % (len(commands), ptot))
+
+    # TODO: Pre-score commands with all possible sentences.
+
+    # Get user input here (normally).
+    utterance = 'pick up obj0'
+
+    for s in sentences:
+        s.score_match(utterance)
+    Util.normalize(sentences)
+    sentences = sorted(sentences, key=lambda x: -x.score)
+    Debug.p('Sentences:')
+    for s in sentences:
+        Debug.pl(1, s)
 
     # OLD
     # ---
