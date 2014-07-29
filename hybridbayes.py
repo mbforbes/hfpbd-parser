@@ -13,18 +13,22 @@ Here's the process:
     - Use the CommandTemplates to generate all Commands
 
     - Apply the world (W) and robot (R) states into the Commands to get
-        a prior over which are most likely (P(C|W,R)).
+        a prior over which are most likely (P(C|W,R)). (Command.score)
 
     - Use all Commands to generate all Sentences
 
     - Pre-match-score all Commands with Sentences based on Phrase
-        matches (P(C|L))
+        matches (P(C|L)).
 
     - When an utterance comes in, score all Sentences based on Phrase
         matching strategies (subclass of MatchingStrategy) (P(L))
 
-    - Weight Command-Sentences scores with the Sentence-utterance scores
-        to find the most likely command C.
+    - Combine Command-Sentences scores with the Sentence-utterance
+        scores to find the language score. (Command.lang_score)
+
+    - Combine the W, R-induced probability P(C|W,R) with the language
+        score P(L|W,R,C) to get the final probability P(C|W,R,C,L)
+        (Command.final_p).
 '''
 
 ########################################################################
@@ -75,18 +79,18 @@ M_RP = {
 
 # Command score
 START_SCORE = 0.0  # To begin with. Maybe doesn't matter.
-MIN_SCORE = 10.0  # Minimum score for normalizing. Only adds to match.
-P_LOCUNR = -50  # Penalty: the requested location is unreachable.
-P_OBJUNR = -50  # Penalty: the requested object cannot be picked up.
-P_NOTLASTSIDE = -10  # Penalty: the side wasn't the last commanded.
-P_GSTATE = -80  # Penalty: nonsensical gripper state change requested.
-P_BADPP = -50  # Penalty: bad pickup/place command requested (from GS)
+MIN_SCORE = 1.0  # Minimum score for normalizing. Only adds to match.
+P_LOCUNR = -5.0  # Penalty: the requested location is unreachable.
+P_OBJUNR = -5.0  # Penalty: the requested object cannot be picked up.
+P_NOTLASTSIDE = -1.0  # Penalty: the side wasn't the last commanded.
+P_GSTATE = -8.0  # Penalty: nonsensical gripper state change requested.
+P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 
 # Language score
-LANG_MATCH_SCORE = 90
-LANG_UNMATCH_SCORE = -90
-CMD_PHRASE_MATCH_SCORE = 90
-CMD_PHRASE_UNMATCH_SCORE = -90
+LANG_MATCH_SCORE = 9.0
+LANG_UNMATCH_SCORE = -9.0
+CMD_PHRASE_MATCH_SCORE = 9.0
+CMD_PHRASE_UNMATCH_SCORE = -9.0
 
 
 ########################################################################
@@ -425,18 +429,52 @@ class Command:
         Returns:
             str
         '''
-        lnl = CommandDict.longest_cmd_name_len
+        return "%s  %s  %s" % (
+            self._score_str(), self._name_str(), self._opt_str())
+
+    def pure_str(self):
+        '''
+        Returns a string without any score info.
+
+        Returns:
+            str
+        '''
+        return "%s  %s" % (self._name_str(), self._opt_str())
+
+    def _score_str(self):
+        '''
+        Any scores that have been set.
+
+        Returns:
+            str
+        '''
         score_str = "score: %0.7f" % (self.score)
         if self.lang_score != 0.0:
             score_str += ", lang_score: %0.7f" % (self.lang_score)
         if self.final_p != 0.0:
             score_str += ", final_p: %0.7f" % (self.final_p)
+        return score_str
+
+    def _name_str(self):
+        '''
+        Name plus padding.
+
+        Returns:
+            str
+        '''
+        lnl = CommandDict.longest_cmd_name_len
         padding = 0 if len(self.name) == lnl else lnl - len(self.name)
-        name_str = self.name + ' ' * padding
-        opt_str = ', '.join(
-            [': '.join(
-                [str(k), str(v)]) for k, v in self.option_map.iteritems()])
-        return "%s   %s   %s" % (score_str, name_str, opt_str)
+        return self.name + ' ' * padding
+
+    def _opt_str(self):
+        '''
+        Option list in readable format.
+
+        Returns:
+            str
+        '''
+        return ', '.join([': '.join(
+            [str(k), str(v)]) for k, v in self.option_map.iteritems()])
 
     @staticmethod
     def apply_l_precheck(commands, sentences):
@@ -653,7 +691,10 @@ class Command:
         Args:
             sentences ([Sentence])
         '''
-        Debug.p('Sentence-matching command: ' + str(self))
+        # Display settings.
+        display_limit = 5
+
+        # Debug.p('Sentence-matching command: ' + str(self))
         # Empty list before we start adding to it.
         if len(self.sentence_match_probs) != 0:
             self.sentence_match_probs = {}
@@ -693,12 +734,26 @@ class Command:
                     score += CMD_PHRASE_UNMATCH_SCORE
 
             scores += [score]
-            Debug.pl(1, '%0.2f %s' % (score, str(sentence)))
+            # Debug.pl(1, '%0.2f %s' % (score, str(sentence)))
 
         # Normalize, save
         scores = Util.normalize_list(scores)
         for idx, sentence in enumerate(sentences):
             self.sentence_match_probs[sentence] = scores[idx]
+
+        # Debug
+        Debug.p(
+            'Sentence-matching scores for command: ' + str(self.pure_str()))
+        all_scores = self.sentence_match_probs.values()
+        all_scores = list(reversed(sorted(all_scores)))
+        all_scores = ['%0.5f' % (s) for s in all_scores]
+        Debug.pl(1, "Top %d:" % (display_limit))
+        for ts in  all_scores[:display_limit]:
+            Debug.pl(2, ts)
+        Debug.pl(1, "Bottom %d:" % (display_limit))
+        for bs in  all_scores[-display_limit:]:
+            Debug.pl(2, bs)
+
 
     def apply_l(self, sentences):
         '''
@@ -1019,7 +1074,7 @@ class WorldObject:
 
 def main():
     # Display settings.
-    display_limit = 20
+    display_limit = 200
 
     # Load
     command_dict = CommandDict(yaml.load(open(COMMAND_GRAMMAR)))
