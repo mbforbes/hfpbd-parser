@@ -4,23 +4,23 @@ commands:
     move_rel:
         - move_rel
         - side
-        - relpos
+        - rel_pos
         - obj
     move_abs:
         - move_abs
         - side
-        - absdir
-    pickup:
-        - pickup
+        - abs_dir
+    pick_up:
+        - pick_up
         - obj
         - side
     place:
         - place
-        - relpos
+        - rel_pos
         - obj
         - side
-    lookat:
-        - lookat
+    look_at:
+        - look_at
         - obj
     open:
         - open
@@ -48,18 +48,37 @@ commands:
 #
 # etc.
 parameters:
-    relpos:
+    rel_pos:
         - above
-        - nextto
-    absdir:
+        - next_to
+    abs_dir:
         - up
         - down
-        - toleft
-        - toright
+        - to_left
+        - to_right
     side:
-        - right
-        - left
-
+        - right_hand
+        - left_hand
+# Ways we can talk about objects. These serve as filters to select the
+# options below (they aren't loaded like parameters). Otherwise, these
+# are similar to parameters in that they map to options.
+descriptors:
+    location:
+        - left_most
+        - right_most
+        - farthest
+        - nearest
+    size:
+        - biggest
+        - smallest
+    color:
+        - red
+        - green
+        - blue
+    type:
+        - box
+        - cup
+        - unknown
 # options -> phrases
 # These are the spoken utterance options for all commands and options.
 options:
@@ -69,7 +88,7 @@ options:
     move_abs:
         phrases:
             - move
-    pickup:
+    pick_up:
         phrases:
             - pick up
             - grab
@@ -77,7 +96,7 @@ options:
         phrases:
             - place
             - put
-    lookat:
+    look_at:
         phrases:
             - look at
             - look
@@ -95,7 +114,7 @@ options:
     above:
         phrases:
             - above
-    nextto:
+    next_to:
         phrases:
             - next to
     up:
@@ -106,21 +125,74 @@ options:
         phrases:
             - down
             - lower
-    toleft:
+    to_left:
         phrases:
             - to the left
             - left
         strategy: notside
-    toright:
+    to_right:
         phrases:
             - to the right
             - right
         strategy: notside
-    right:
+    right_hand:
         phrases:
             - right hand
             - right arm
-    left:
+    left_hand:
         phrases:
             - left hand
             - left arm
+# Ways we can talk about objects (these are still options).
+# Location
+    left_most:
+        phrases:
+            - left most
+            - left
+        strategy: notside
+    right_most:
+        phrases:
+            - right most
+            - right
+        strategy: notside
+    farthest:
+        phrases:
+            - farthest
+    nearest:
+        phrases:
+            - nearest
+            - closest
+# Size
+    biggest:
+        phrases:
+            - biggest
+            - largest
+            - big
+            - large
+    smallest:
+        phrases:
+            - smallest
+            - small
+# Color
+    red:
+        phrases:
+            - red
+            - crimson
+    blue:
+        phrases:
+            - blue
+    green:
+        phrases:
+            - green
+# Type
+    box:
+        phrases:
+            - box
+            - cube
+    cup:
+        phrases:
+            - cup
+    unknown:
+        phrases:
+            - thing
+            - object

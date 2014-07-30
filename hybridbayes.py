@@ -67,20 +67,36 @@ OBJ_PARAM = 'obj'
 FLOAT_COMPARE_EPSILON = 0.001
 
 # How to index into object properties by side
-S = {'right': 0, 'left': 1}
+SIDES = yaml.load(open(COMMAND_GRAMMAR))['parameters']['side']
+sides_map = {}
+for idx, side_name in enumerate(SIDES):
+    sides_map[side_name] = idx
+S = sides_map
 
 # Map (M) from component options to object properties (OP).
 M_OP = {
     'above': 'is_above_reachable',
-    'nextto': 'is_nextto_reachable',
+    'next_to': 'is_nextto_reachable',
 }
 
 # Map (M) from component options to robot properties (RP).
 M_RP = {
     'up': 'can_move_up',
     'down': 'can_move_down',
-    'toleft': 'can_move_toleft',
-    'toright': 'can_move_toright',
+    'to_left': 'can_move_toleft',
+    'to_right': 'can_move_toright',
+}
+
+# Map (M) from object properties to WordOption names (WO)
+M_WO = {
+    # Location
+    'is_leftmost': 'left_most',
+    'is_rightmost': 'right_most',
+    'is_farthest': 'farthest',
+    'is_nearest': 'nearest',
+    # Size
+    'is_biggest': 'biggest',
+    'is_smallest': 'smallest',
 }
 
 # Command score
@@ -320,14 +336,10 @@ class CommandDict:
                 from a YAML file).
 
         Returns:
-            {str: Option}
+            {str: Option}: Map of option name: Option.
         '''
-        # Make object options first.
         options = {}
-        for wobj in wobjs:
-            options[wobj.properties['name']] = ObjectOption(wobj)
-
-        # Go bottom-up.
+        # Make word options from phrases.
         matcher = DefaultMatcher
         for opt_name, props in self.ydict['options'].iteritems():
             # Get strategy, if special
@@ -342,6 +354,11 @@ class CommandDict:
             # Make our word option and add it.
             w_opt = WordOption(opt_name, phrases)
             options[opt_name] = w_opt
+
+        # Now make object options, because they are described by word
+        # options.
+        for wobj in wobjs:
+            options[wobj.get_property('name')] = ObjectOption(wobj, options)
 
         Debug.p('Options: ' + str(options.values()))
         return options
@@ -427,8 +444,6 @@ class CommandTemplate:
 class Command:
     '''A fully-instantiated command.
 
-    Here's the process:
-
     Has state: YES
     '''
 
@@ -471,6 +486,19 @@ class Command:
             str
         '''
         return "%s  %s" % (self._name_str(), self._opt_str())
+
+    def opt_str_list(self):
+        '''
+        Returns a list of strings, one for each option, of the option's
+        'cannonical' name.
+        '''
+        return [v.pure_str() for k, v in self.option_map.iteritems()]
+
+    def get_name(self):
+        '''
+        Returns the 'cannonical' name of the command (no padding).
+        '''
+        return self.name
 
     def _score_str(self):
         '''
@@ -561,6 +589,9 @@ class Command:
     @staticmethod
     def _gen_phrases(todo, results=[]):
         '''
+        Recursively generates an exhaustive list of lists of phrases
+        from the passed options in todo.
+
         Args:
             todo [Option]
             results ([[Phrase]])
@@ -637,28 +668,36 @@ class Command:
         # We'll filter by name, as template sets will be brittle.
         # cmds: move_rel, place (params: relpos, side)
         if self.name in ['move_rel', 'place']:
-            relpos = self.option_map['relpos'].name
+            relpos = self.option_map['rel_pos'].name
             side = self.option_map['side'].name
-            reachables = wobj.properties[M_OP[relpos]]
-            if side in ['right', 'left']:
-                loc_reachable = reachables[S[side]]
-            else:
-                # Side == both
-                loc_reachable = reachables[0] and reachables[1]
-            if not loc_reachable:
-                self.score += P_LOCUNR
+            # NOTE(mbforbes): What do we assume if there's no such
+            # property? I'll assume no informations means do not affect
+            # the score.
+            if wobj.has_property(M_OP[relpos]):
+                reachables = wobj.get_property(M_OP[relpos])
+                if side in SIDES:
+                    loc_reachable = reachables[S[side]]
+                else:
+                    # Side == both
+                    loc_reachable = reachables[0] and reachables[1]
+                if not loc_reachable:
+                    self.score += P_LOCUNR
 
         # cmds: pickup (params: side)
-        if self.name in ['pickup']:
+        if self.name in ['pick_up']:
             side = self.option_map['side'].name
-            reachables = wobj.properties['is_pickupable']
-            if side in ['right', 'left']:
-                loc_reachable = reachables[S[side]]
-            else:
-                # Side == both
-                loc_reachable = reachables[0] and reachables[1]
-            if not loc_reachable:
-                self.score += P_OBJUNR
+            # NOTE(mbforbes): What do we assume if there's no such
+            # property? I'll assume no informations means do not affect
+            # the score.
+            if wobj.has_property('is_pickupable'):
+                reachables = wobj.get_property('is_pickupable')
+                if side in SIDES:
+                    loc_reachable = reachables[S[side]]
+                else:
+                    # Side == both
+                    loc_reachable = reachables[0] and reachables[1]
+                if not loc_reachable:
+                    self.score += P_OBJUNR
 
     def apply_r(self, robot):
         '''
@@ -701,7 +740,7 @@ class Command:
             if self.name == 'close':
                 if gs == 'closed_empty' or gs == 'has_obj':
                     self.score += P_GSTATE
-            if self.name == 'pickup':
+            if self.name == 'pick_up':
                 if gs == 'has_obj':
                     self.score += P_BADPP
             if self.name == 'place':
@@ -710,7 +749,7 @@ class Command:
 
         # move_abs: absdir possible to move to
         if self.name == 'move_abs':
-            prop_name = M_RP[self.option_map['absdir'].name]
+            prop_name = M_RP[self.option_map['abs_dir'].name]
             if robot.has_property(prop_name):
                 loc_reachable = robot.get_property(prop_name)[side_idx]
                 if not loc_reachable:
@@ -843,6 +882,12 @@ class Option:
         '''
         return ''.join(['|', self.name, '|'])
 
+    def pure_str(self):
+        '''
+        Returns the 'cannonical' name of the option.
+        '''
+        return self.name
+
 
 class WordOption(Option):
     '''Holds options info, including all possible referring phrases.'''
@@ -859,14 +904,67 @@ class ObjectOption(Option):
     '''Holds options info for object, so can generate all possible
     referring phrases.'''
 
-    def __init__(self, world_obj):
+    def __init__(self, world_obj, options):
         '''
         Args:
             world_obj (WorldObject)
+            options ({str: Option}): Map of option name: existing
+                Option. Will contain all WordOptions as well as the
+                ObjectOptions that have been created so far. What we
+                care about are the WordOptions (any inter-object state
+                is pre-computed before objects are sent).
         '''
         # self.param_name = OBJ_PARAM
-        self.name = world_obj.properties['name']
+        self.name = world_obj.get_property('name')
         self.world_obj = world_obj
+        self.word_options = self._get_word_options(options)
+
+    def _get_word_options(self, options):
+        '''
+        Args:
+            options ({str: Option}): Map of option name: existing
+                Option. Will contain all WordOptions as well as the
+                ObjectOptions that have been created so far. What we
+                care about are the WordOptions (any inter-object state
+                is pre-computed before objects are sent).
+
+        Returns:
+            [WordOption]: The word options that describe this.
+        '''
+        # Here is the ordering use for word options (phrases can appear
+        # in any order for utterances, so this only matters for when
+        # we generate phrases to be spoken to the user).
+        #
+        # Further, note that we don't currently weight estimates for
+        # object properties, as they are bools. If we do weight them,
+        # we'll want to use this to decide which properties to output
+        # (talk about color rather than location if we're the most sure
+        # about it).
+        #
+        # - location (leftmost, rightmost, etc.)
+        # - size (biggest, smallest)
+        # - color (red, green, blue)
+        # - type (box, cup, unknown)
+        #
+        # First, we do the unique properties (left-most, biggest, etc.)
+        word_options = []
+        for object_property, word_option_name in M_WO.iteritems():
+            # NOTE: The properties are currently bools, so
+            # get_property(...) is enough.
+            if (self.world_obj.has_property(object_property) and
+                    self.world_obj.get_property(object_property)):
+                word_option = options[word_option_name]
+                word_options += [word_option]
+
+        # Now we do non-unique properties (red, box, etc.)
+        props = ['color', 'type']
+        for prop in props:
+            if self.world_obj.has_property(prop):
+                prop_val = self.world_obj.get_property(prop)
+                word_option = options[prop_val]
+                word_options += [word_option]
+
+        return word_options
 
     def __repr__(self):
         '''
@@ -888,6 +986,7 @@ class ObjectOption(Option):
             [Phrase]
         '''
         # TODO(mbforbes): Implement this fully using object properties.
+        # CURSPOT
         return [Phrase(self.name, DefaultMatcher)]
 
 
@@ -976,6 +1075,9 @@ class Phrase:
 
     def __eq__(self, other):
         '''
+        Args:
+            other (Phrase)
+
         Returns:
             bool
         '''
@@ -983,6 +1085,9 @@ class Phrase:
 
     def __ne__(self, other):
         '''
+        Args:
+            other (Phrase)
+
         Returns:
             bool
         '''
@@ -996,21 +1101,52 @@ class WorldObject:
     Can be robot or YAML-loaded.
     '''
 
-    def __init__(self):
-        pass
+    def __init__(self, properties=None):
+        '''
+        Use from_dicts if calling from yaml-loaded list of property
+        dictionaries.
+        '''
+        if properties is None:
+            properties = {}
+        self.properties = properties
 
     @staticmethod
-    def from_yaml(objs):
+    def from_dicts(objs):
         '''
         Args:
-            objs (dict): YAML-loaded 'objects' component of world dict.
+            objs ([{str: object}]): List of dicts, each with a mapping
+                from property name to value.
+
+                This will likely be the YAML-loaded 'objects' component
+                of world dict for basic testing, programmatically-
+                constructed for programtic testing, and robot-sensor-
+                supplied for real robot usage.
+
+        Returns:
+            [WorldObject]
         '''
-        wobjs = []
-        for obj in objs:
-            wobj = WorldObject()
-            wobj.properties = obj
-            wobjs += [wobj]
-        return wobjs
+        return [WorldObject(obj_dict) for obj_dict in objs]
+
+    def has_property(self, name):
+        '''
+        Returns whether world object has a property.
+
+        This is really mostly useful for testing, where we might omit
+        some world object state.
+
+        Returns:
+            bool
+        '''
+        return name in self.properties
+
+    def get_property(self, name):
+        '''
+        Gets a world object's property by name.
+
+        Returns:
+            object
+        '''
+        return self.properties[name]
 
 
 class Robot:
@@ -1018,10 +1154,20 @@ class Robot:
     Provides an interface for accessing robot data.
     '''
 
-    def __init__(self, yaml_dict=None):
-        if yaml_dict is None:
-            yaml_dict = {}
-        self.properties = yaml_dict
+    def __init__(self, properties=None):
+        '''
+        Args:
+            properties ({str: object}, optional): Mapping of names to
+                properties, which are usually strings, bools, or
+                two-element bool lists (for right, left hands). This
+                will likely come from a yaml-loaded dictionary in
+                basic testing, a programatiicaly-created dictionary in
+                programtic testing, and the real robot (via a ROS
+                message) in real-robot testing.
+        '''
+        if properties is None:
+            properties = {}
+        self.properties = properties
 
     def has_property(self, name):
         '''
@@ -1043,6 +1189,81 @@ class Robot:
             object
         '''
         return self.properties[name]
+
+
+class RobotCommand:
+    '''A Command wrapper that will generate objects in the forms that
+    will be returned to the robot (or something close for us humans to
+    read).
+    '''
+
+    def __init__(self, name, args):
+        '''
+        Used internally. Use a factory if you're calling this from
+        outside this class.
+
+        Args:
+            name (str)
+            args ([str])
+        '''
+        self.name = name
+        self.args = args
+
+    @staticmethod
+    def from_command(command):
+        '''
+        Factory.
+
+        Args:
+            command (Command)
+
+        Returns:
+            RobotCommand
+        '''
+        # Note that we skip the first option in the list, because this
+        # is the name of the command itself.
+        return RobotCommand(command.get_name(), command.opt_str_list()[1:])
+
+    @staticmethod
+    def from_strs(name, args):
+        '''
+        Factory.
+
+        Args:
+            name (str)
+            args ([str])
+
+        Returns:
+            RobotCommand
+        '''
+        return RobotCommand(name, args)
+
+    def __eq__(self, other):
+        '''
+        Args:
+            other (RobotCommand)
+
+        Returns:
+            bool
+        '''
+        return self.name == other.name and self.args == other.args
+
+    def __ne__(self, other):
+        '''
+        Args:
+            other (RobotCommand)
+
+        Returns:
+            bool
+        '''
+        return self.name != other.name or self.args != other.args
+
+    def __repr__(self):
+        '''
+        Returns:
+            str
+        '''
+        return ': '.join([self.name, ', '.join(self.args)])
 
 
 class Parser:
@@ -1088,8 +1309,7 @@ class Parser:
         # Provide initial world, robot
         self.set_default_world()
         utterance = 'move right hand to the right'
-        res = self.parse(utterance)[0]
-        Info.p(res)
+        Info.p(self.parse(utterance)[0])
 
     def default_interactive_loop(self):
         '''
@@ -1156,8 +1376,10 @@ class Parser:
             utterance (str)
 
         Returns:
-            (str,str): 2-tuple of the top command as a string, any debug
-                output.
+            (RobotCommand,str): 2-tuple of
+                - the top command as a RobotCommand
+                - any buffered logging (debug, info, etc.), if logging
+                    has been buffered.
         '''
         self.lock.acquire()
         if self.world_objects is None or self.robot is None:
@@ -1199,10 +1421,8 @@ class Parser:
             ptot += c.final_p
         Info.p('Total (%d): %0.2f' % (len(self.commands), ptot))
 
-        # TODO(mbforbes): Currently just returning string. Probably want
-        # to serialize needed information instead.
         ret = (
-            self.commands[0].pure_str(),
+            RobotCommand.from_command(self.commands[0]),
             '\n'.join([self.start_buffer, self.get_print_buffer()])
         )
         self.lock.release()
@@ -1214,15 +1434,19 @@ class Parser:
         Sets "default" (file-specified) world objects and robot.
         '''
         world_dict = yaml.load(open(WORLD))
-        w_objects = WorldObject.from_yaml(world_dict['objects'])
+        w_objects = WorldObject.from_dicts(world_dict['objects'])
         robot = Robot(world_dict['robot'])
         self.set_world(w_objects, robot)
 
     def _update_world_internal(self):
         '''
-        Args:
-            world_objects ([WorldObject])
-            robot (Robot)
+        Re-generates all phrases, options, parameters, templates,
+        commands, sentences based on (presumably) updated world objects
+        and/or robot state.
+
+        The following must be set prior to calling:
+            - self.world_objects ([WorldObject])
+            - self.robot (Robot)
         '''
         # Make templates (this extracts options and params).
         self.templates = self.command_dict.make_templates(self.world_objects)
@@ -1265,8 +1489,20 @@ class Parser:
 
 
 ########################################################################
-# Main
+# Main and experimental stuff.
 ########################################################################
+
+def play(parser):
+    '''
+    Where I try CRAZY stuff out.
+
+    ...like whether things are broken.
+
+    Args:
+        parser (Parser): Just initialized to the grammar, un-query'd.
+    '''
+    pass
+
 
 def main():
     arg = None
@@ -1280,6 +1516,8 @@ def main():
         parser.default_interactive_loop()
     elif arg == 'interactive-simple':
         parser.simple_interactive_loop()
+    elif arg == '':
+        play(parser)
     else:
         Error.p("Unknown option: " + arg)
 

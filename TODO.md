@@ -1,0 +1,4 @@
+- [MEDIUM] Refactor all strings in hybridbayes
+- [LOW] Restructure project by
+	- separating hybridbayes, web, and test into higher-level modules
+	- refactoring some classes within hybridbayes into other modules

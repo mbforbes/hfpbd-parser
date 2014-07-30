@@ -51,7 +51,7 @@ def parse():
             res, debug = parser.parse(data)
             return render_template(
                 'template.html',
-                response=res,
+                response=str(res),
                 debug=debug,
                 objs=objs_str,
                 robot=robot_str

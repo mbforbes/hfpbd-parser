@@ -3,25 +3,28 @@ objects:
     -   name: obj0
         # Relation to arms.
         is_pickupable: [true, false]
-        is_above_reachable: [false, false]
-        is_nextto_reachable: [false, false]
-        # Relation to other objects. These should be more general.
-        is_leftmost: false
-        is_righttmost: false
-        is_biggest: false
-        is_smallest: false
+        is_above_reachable: [false, true]
+        is_nextto_reachable: [true, false]
         # E.g. red, blue, green, unknown
         color: red
         has_distinct_color: false
         # E.g. cup, box, unknown
         type: box
         has_distinct_type: false
+        # Relation to other objects. These are only set when there are
+        # multiple objects.
+        is_leftmost: false
+        is_righttmost: false
+        is_farthest: false
+        is_nearest: false
+        is_biggest: false
+        is_smallest: false
     # -   name: obj1
 robot:
     # open, closed_empty, has_obj
     gripper_states: [closed_empty, closed_empty]
     # right, left, neither
-    last_cmd_side: left
+    last_cmd_side: left_hand
     can_move_up: [true, true]
     can_move_down: [false, false]
     can_move_toleft: [true, true]
