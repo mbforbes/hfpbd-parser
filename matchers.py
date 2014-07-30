@@ -86,18 +86,22 @@ class NotSideMatcher:
         # we're really matching the phrase...
         indexes = NotSideMatcher.find_all(words, utterance)
 
+        all_clear = False
         for index in indexes:
+            bw_found = False
             nextidx = index + len(words) + 1  # + 1 for space
             # If the next word is neither 'hand' nor 'arm', we've
             # matched NOT one of the side phrases.
             if nextidx < len(utterance):
                 for bw in bad_follow_words:
-                    if utterance[nextidx:nextidx + len(bw)] != bw:
-                        return True
-
-        # We couldn't find any indexes that weren't just side indexes.
-        # So there are no matches.
-        return False
+                    possible_bw = utterance[nextidx:nextidx + len(bw)]
+                    if possible_bw == bw:
+                        bw_found = True
+            # If this index has avoided all bad words, we're clear.
+            if not bw_found:
+                all_clear = True
+                break
+        return all_clear
 
 
 class Matchers:
@@ -106,3 +110,18 @@ class Matchers:
         'default': DefaultMatcher,
         'notside': NotSideMatcher
     }
+
+# TODO(mbforbes): Put this in a test directory.
+if __name__ == '__main__':
+    sides = ['right', 'left']
+    for i, side in enumerate(sides):
+        assert not NotSideMatcher.match(side, side + ' hand')
+        assert not NotSideMatcher.match(side, side + ' arm')
+        assert not NotSideMatcher.match(side, side + ' arm ' + side + ' hand')
+        assert not NotSideMatcher.match(side, side + ' hand ' + side + ' arm')
+
+        assert NotSideMatcher.match(side, side + ' ' + side + ' hand')
+        assert NotSideMatcher.match(side, side + ' hand ' + side)
+        assert NotSideMatcher.match(side, side)
+        assert NotSideMatcher.match(side, 'move right hand ' + side)
+        assert NotSideMatcher.match(side, 'move left hand ' + side)

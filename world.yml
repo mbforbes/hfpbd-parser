@@ -2,7 +2,7 @@
 objects:
     -   name: obj0
         # Relation to arms.
-        is_pickupable: [truex, false]
+        is_pickupable: [true, false]
         is_above_reachable: [false, false]
         is_nextto_reachable: [false, false]
         # Relation to other objects. These should be more general.

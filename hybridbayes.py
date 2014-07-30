@@ -93,8 +93,9 @@ P_GSTATE = -8.0  # Penalty: nonsensical gripper state change requested.
 P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 
 # Language score
-LANG_MATCH_SCORE = 20.0
-LANG_UNMATCH_SCORE = -10.0
+LANG_MATCH_START = 0.1
+LANG_MATCH_SCORE = 1.0
+LANG_UNMATCH_SCORE = 0.0
 CMD_PHRASE_MATCH_START = 0.1
 CMD_PHRASE_MATCH_CMD = 1.0  # Maximum given for matching command options.
 CMD_PHRASE_MATCH_PHRASE = 1.0  # Maximum given for matching utterance phrases.
@@ -703,7 +704,7 @@ class Command:
             sentences ([Sentence])
         '''
         # Display settings.
-        display_limit = 5
+        display_limit = 8
 
         # Debug.p('Sentence-matching command: ' + str(self))
         # Empty list before we start adding to it.
@@ -904,14 +905,18 @@ class Sentence:
         Args:
             utterance (str)
         '''
-        self.score = 0
+        total_score = 0.0
         # Debug.pl(1, "Scoring sentence: " + str(self))
         for phrase in self.phrases:
             phrase_score = phrase.score(utterance)
             # Debug.pl(
             #     2,
             #     "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
-            self.score += phrase_score
+            total_score += phrase_score
+
+        # We currently weight the scores by the max.
+        max_score = len(self.phrases) * LANG_MATCH_SCORE
+        self.score = LANG_MATCH_START + total_score / max_score
 
 
 class Phrase:
@@ -1023,7 +1028,7 @@ class Robot:
 class Parser:
 
     # Couple settings (currently for debugging)
-    display_limit = 5
+    display_limit = 8
 
     def __init__(self, grammar_yaml=COMMAND_GRAMMAR):
         # Load
@@ -1133,13 +1138,13 @@ class Parser:
         # Score sentences.
         for s in self.sentences:
             s.score_match(utterance)
-        # Util.normalize(sentences)
+        # Util.normalize(self.sentences)
 
         # Apply L.
         Command.apply_l_precheck(self.commands, self.sentences)
         for c in self.commands:
             c.apply_l(self.sentences)
-        Util.normalize(self.commands, 'lang_score', 0.0)
+        # Util.normalize(self.commands, 'lang_score', 0.0)
 
         # Get combined probability.
         for c in self.commands:
