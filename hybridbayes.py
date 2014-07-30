@@ -479,11 +479,11 @@ class Command:
         Returns:
             str
         '''
-        score_str = "score: %0.3f" % (self.score)
+        score_str = "score: %0.4f" % (self.score)
         if self.lang_score != 0.0:
-            score_str += ", lang_score: %0.3f" % (self.lang_score)
+            score_str += ", lang_score: %0.4f" % (self.lang_score)
         if self.final_p != 0.0:
-            score_str += ", final_p: %0.3f" % (self.final_p)
+            score_str += ", final_p: %0.4f" % (self.final_p)
         return score_str
 
     def _name_str(self):
