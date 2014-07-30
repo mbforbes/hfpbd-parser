@@ -36,9 +36,11 @@ robot = world['robot']
 objs_str = yaml.dump(objs)
 robot_str = yaml.dump(robot)
 
+
 @app.route('/style.css')
 def style():
     return app.send_static_file('style.css')
+
 
 @app.route('/', methods=['GET', 'POST'])
 def parse():

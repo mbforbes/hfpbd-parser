@@ -549,11 +549,13 @@ class Command:
                             'sentence: %s') % (str(c), str(s)))
                     sys.exit(1)
 
-            # Ensure sentence match scores normalized.
-            # sum_ = sum(p for s, p in c.sentence_match_probs.iteritems())
+            # # Ensure sentence match scores normalized.
+            # sum_ = sum(
+            #     p for s, p in c.sentence_match_probs.iteritems())
             # if not Util.are_floats_close(sum_, 1.0):
             #     Error.p(
-            #         'Command sentence_match_probs not normed: %0.3f' % (sum_))
+            #         'Command sentence_match_probs not normed: %0.3f'
+            #         % (sum_))
             #     sys.exit(1)
 
     @staticmethod
@@ -785,7 +787,6 @@ class Command:
         # for bs in  all_scores[-display_limit:]:
         #     Debug.pl(2, bs)
 
-
     def apply_l(self, sentences):
         '''
         Applies utterance-scored sentences to command-matched score.
@@ -988,9 +989,6 @@ class Phrase:
         return self.words != other.words
 
 
-
-
-
 class WorldObject:
     '''
     Contains data about the properties of an object in the world.
@@ -1013,6 +1011,7 @@ class WorldObject:
             wobj.properties = obj
             wobjs += [wobj]
         return wobjs
+
 
 class Robot:
     '''
