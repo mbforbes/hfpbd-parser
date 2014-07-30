@@ -85,6 +85,7 @@ O_FULL_REACHABLE = {
     'has_distinct_type': True,
 }
 
+
 # ######################################################################
 # Classes (test categories)
 # ######################################################################
@@ -105,6 +106,7 @@ class FullNoContext(unittest.TestCase):
         for cmd in S_MOVEABS.iterkeys():
             self.assertEqual(self.parser.parse(
                 S_MOVEABS[cmd])[0], RC_MOVEABS[cmd])
+
 
 class FullOneObjNoRobot(unittest.TestCase):
     def setUp(self):
