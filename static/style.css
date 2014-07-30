@@ -37,3 +37,8 @@ pre.debug {
 .key {
 	font-weight: 400;
 }
+
+.note {
+	text-align: center;
+	font-style: italic;
+}
