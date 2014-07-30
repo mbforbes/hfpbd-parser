@@ -13,10 +13,27 @@ input {
   width: 100%;
 }
 
-h1 {
+h1, h2 {
 	text-align: center;
 }
 
 .row {
 	padding-top: 20px;
+}
+
+pre.state {
+  background-color: #3f3f3f;
+  color: #ffffbf;
+}
+
+pre.debug {
+	font-size: 8pt;
+	overflow-x: scroll;
+	word-wrap: normal;
+	background-color: #f2f2f2;
+	color: #232323;
+}
+
+.key {
+	font-weight: 400;
 }

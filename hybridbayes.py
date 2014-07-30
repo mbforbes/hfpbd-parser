@@ -58,7 +58,7 @@ DEBUG = True  # Turn off for significant speedups.
 
 ERROR_PRINTING_DEFAULT = True
 INFO_PRINTING_DEFAULT = True
-DEBUG_PRINTING_DEFAULT = False
+DEBUG_PRINTING_DEFAULT = True
 
 COMMAND_GRAMMAR = 'commands.yml'
 WORLD = 'world.yml'
@@ -108,8 +108,10 @@ CMD_PHRASE_MATCH_PHRASE = 1.0  # Maximum given for matching utterance phrases.
 ########################################################################
 
 class Logger:
+    buffer_printing = False
     printing = False
     prefix = '[IMPLEMENT ME]'
+    print_buffer = []
 
     @classmethod
     def p(cls, obj):
@@ -124,8 +126,27 @@ class Logger:
         '''
         string = str(obj)
         if cls.printing:
-            indent = ' ' if level == 0 else '\t' * (level + 1)
-            print ''.join([cls.prefix, indent, string])
+            # tab = '\t'  # use for 'normal' tabs
+            tab = '  '  # use for 'space' tabs (adjust as needed)
+            indent = ' ' if level == 0 else tab * (level + 1)
+            output = ''.join([cls.prefix, indent, string])
+            if Logger.buffer_printing:
+                # Save for later
+                Logger.print_buffer += [output]
+            else:
+                print output
+
+    @staticmethod
+    def get_buffer():
+        '''
+        Empties and returns buffer.
+
+        Returns:
+            str
+        '''
+        retstr = '\n'.join(Logger.print_buffer)
+        Logger.print_buffer = []
+        return retstr
 
 
 # Error
@@ -458,11 +479,11 @@ class Command:
         Returns:
             str
         '''
-        score_str = "score: %0.7f" % (self.score)
+        score_str = "score: %0.3f" % (self.score)
         if self.lang_score != 0.0:
-            score_str += ", lang_score: %0.7f" % (self.lang_score)
+            score_str += ", lang_score: %0.3f" % (self.lang_score)
         if self.final_p != 0.0:
-            score_str += ", final_p: %0.7f" % (self.final_p)
+            score_str += ", final_p: %0.3f" % (self.final_p)
         return score_str
 
     def _name_str(self):
@@ -752,17 +773,17 @@ class Command:
             self.sentence_match_probs[sentence] = scores[idx]
 
         # Debug
-        Debug.p(
-            'Sentence-matching scores for command: ' + str(self.pure_str()))
-        all_scores = self.sentence_match_probs.values()
-        all_scores = list(reversed(sorted(all_scores)))
-        all_scores = ['%0.5f' % (s) for s in all_scores]
-        Debug.pl(1, "Top %d:" % (display_limit))
-        for ts in  all_scores[:display_limit]:
-            Debug.pl(2, ts)
-        Debug.pl(1, "Bottom %d:" % (display_limit))
-        for bs in  all_scores[-display_limit:]:
-            Debug.pl(2, bs)
+        # Debug.p(
+        #     'Sentence-matching scores for command: ' + str(self.pure_str()))
+        # all_scores = self.sentence_match_probs.values()
+        # all_scores = list(reversed(sorted(all_scores)))
+        # all_scores = ['%0.5f' % (s) for s in all_scores]
+        # Debug.pl(1, "Top %d:" % (display_limit))
+        # for ts in  all_scores[:display_limit]:
+        #     Debug.pl(2, ts)
+        # Debug.pl(1, "Bottom %d:" % (display_limit))
+        # for bs in  all_scores[-display_limit:]:
+        #     Debug.pl(2, bs)
 
 
     def apply_l(self, sentences):
@@ -1030,7 +1051,10 @@ class Parser:
     # Couple settings (currently for debugging)
     display_limit = 8
 
-    def __init__(self, grammar_yaml=COMMAND_GRAMMAR):
+    def __init__(self, grammar_yaml=COMMAND_GRAMMAR, buffer_printing=False):
+        # If set, logger saves ouput
+        Logger.buffer_printing = buffer_printing
+
         # Load
         self.command_dict = CommandDict(yaml.load(open(grammar_yaml)))
 
@@ -1044,6 +1068,13 @@ class Parser:
         self.templates = None
         self.commands = None
 
+    def get_print_buffer(self):
+        '''
+        Returns:
+            str
+        '''
+        return Logger.get_buffer()
+
     def simple_interactive_loop(self):
         '''
         Answers queries using no world objects and no robot state.
@@ -1056,9 +1087,9 @@ class Parser:
         Programmatically runs hardcoded query. Useful for debugging.
         '''
         # Provide initial world, robot
-        self._set_default()
+        self.set_default_world()
         utterance = 'move right hand to the right'
-        res = self.parse(utterance)
+        res = self.parse(utterance)[0]
         Info.p(res)
 
     def default_interactive_loop(self):
@@ -1066,7 +1097,7 @@ class Parser:
         Answers queries using file-saved world objects and robot state.
         '''
         # Provide initial world, robot
-        self._set_default()
+        self.set_default_world()
         self._interactive_loop()
 
     def _interactive_loop(self):
@@ -1076,7 +1107,7 @@ class Parser:
         '''
         while True:
             utterance = raw_input('> ')
-            Info.p(self.parse(utterance))
+            Info.p(self.parse(utterance)[0])
 
     def set_world(self, world_objects=[], robot=Robot()):
         '''
@@ -1126,7 +1157,8 @@ class Parser:
             utterance (str)
 
         Returns:
-            Command: The top command.
+            (str,str): 2-tuple of the top command as a string, any debug
+                output.
         '''
         self.lock.acquire()
         if self.world_objects is None or self.robot is None:
@@ -1153,7 +1185,7 @@ class Parser:
 
         # Display sentences.
         self.sentences = sorted(self.sentences, key=lambda x: -x.score)
-        Info.p('Top sentences:')
+        Info.p('Top %d sentences:' % (Parser.display_limit))
         for idx, s in enumerate(self.sentences):
             if idx < Parser.display_limit:
                 Info.pl(1, s)
@@ -1161,7 +1193,7 @@ class Parser:
         # Display commands.
         self.commands = sorted(self.commands, key=lambda x: -x.final_p)
         ptot = 0.0
-        Info.p("Top commands:")
+        Info.p("Top %d commands:" % (Parser.display_limit))
         for idx, c in enumerate(self.commands):
             if idx < Parser.display_limit:
                 Info.pl(1, c)
@@ -1170,12 +1202,15 @@ class Parser:
 
         # TODO(mbforbes): Currently just returning string. Probably want
         # to serialize needed information instead.
-        ret = self.commands[0].pure_str()
+        ret = (
+            self.commands[0].pure_str(),
+            '\n'.join([self.start_buffer, self.get_print_buffer()])
+        )
         self.lock.release()
 
         return ret
 
-    def _set_default(self):
+    def set_default_world(self):
         '''
         Sets "default" (file-specified) world objects and robot.
         '''
@@ -1226,6 +1261,8 @@ class Parser:
                 Info.pl(1, c)
             ptot += c.score
         Info.p('Total (%d): %0.2f' % (len(self.commands), ptot))
+
+        self.start_buffer = self.get_print_buffer()
 
 
 ########################################################################

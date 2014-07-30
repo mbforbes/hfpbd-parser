@@ -10,6 +10,7 @@ __author__ = 'mbforbes'
 # Builtins
 import os
 import traceback
+import yaml
 
 # 3rd party
 from flask import Flask, render_template, request
@@ -22,8 +23,18 @@ from hybridbayes import Parser
 ########################################################################
 
 app = Flask(__name__)
-parser = Parser()
-parser.set_world()
+
+# Make parser stuff
+parser = Parser(buffer_printing=True)
+parser.set_default_world()
+
+# Get vars to display
+print 'loading'
+world = yaml.load(open('world.yml'))
+objs = world['objects']
+robot = world['robot']
+objs_str = yaml.dump(objs)
+robot_str = yaml.dump(robot)
 
 @app.route('/style.css')
 def style():
@@ -35,15 +46,21 @@ def parse():
         if request.method == 'POST':
             # TODO process
             data = request.form['inputtext']
-            res = parser.parse(data)
+            res, debug = parser.parse(data)
             return render_template(
                 'template.html',
                 response=res,
-                debug=''
+                debug=debug,
+                objs=objs_str,
+                robot=robot_str
             )
         else:
             # GET: just show form
-            return render_template('template.html')
+            return render_template(
+                'template.html',
+                objs=objs_str,
+                robot=robot_str
+            )
     except:
         print traceback.format_exc()
 
