@@ -474,7 +474,7 @@ class Command:
         '''
         lnl = CommandDict.longest_cmd_name_len
         padding = 0 if len(self.name) == lnl else lnl - len(self.name)
-        return self.name + ' ' * padding
+        return ''.join(['<', self.name, '>', ' ' * padding])
 
     def _opt_str(self):
         '''
