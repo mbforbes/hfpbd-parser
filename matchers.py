@@ -77,7 +77,7 @@ class NotSideMatcher:
         Returns:
             bool
         '''
-        bad_follow_words = ['hand', 'arm']
+        bad_follow_words = ['hand', 'arm', 'gripper']
         # Get basic test out of the way.
         if words not in utterance:
             return False
@@ -110,18 +110,3 @@ class Matchers:
         'default': DefaultMatcher,
         'notside': NotSideMatcher
     }
-
-# TODO(mbforbes): Put this in a test directory.
-if __name__ == '__main__':
-    sides = ['right', 'left']
-    for i, side in enumerate(sides):
-        assert not NotSideMatcher.match(side, side + ' hand')
-        assert not NotSideMatcher.match(side, side + ' arm')
-        assert not NotSideMatcher.match(side, side + ' arm ' + side + ' hand')
-        assert not NotSideMatcher.match(side, side + ' hand ' + side + ' arm')
-
-        assert NotSideMatcher.match(side, side + ' ' + side + ' hand')
-        assert NotSideMatcher.match(side, side + ' hand ' + side)
-        assert NotSideMatcher.match(side, side)
-        assert NotSideMatcher.match(side, 'move right hand ' + side)
-        assert NotSideMatcher.match(side, 'move left hand ' + side)

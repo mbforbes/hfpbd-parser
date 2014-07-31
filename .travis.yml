@@ -4,11 +4,8 @@ python:
 install:
     - sudo pip install pep8 coverage python-coveralls PyYAML
 script:
-# Lint
-    - pep8 *.py
 # Test
-    - coverage run test.py
+    - coverage run --source=hybridbayes.py,matchers.py test.py
 after_success:
 # Upload test results
     - coveralls
-

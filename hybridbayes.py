@@ -54,8 +54,6 @@ from matchers import DefaultMatcher, NotSideMatcher, Matchers
 ########################################################################
 
 # Global options
-DEBUG = True  # Turn off for significant speedups.
-
 ERROR_PRINTING_DEFAULT = True
 INFO_PRINTING_DEFAULT = True
 DEBUG_PRINTING_DEFAULT = True
@@ -110,7 +108,7 @@ P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 
 # Language score
 LANG_MATCH_START = 0.1
-LANG_MATCH_SCORE = 1.0
+LANG_MATCH_SCORE = 22.0
 LANG_UNMATCH_SCORE = 0.0
 CMD_PHRASE_MATCH_START = 0.1
 CMD_PHRASE_MATCH_CMD = 1.0  # Maximum given for matching command options.
@@ -246,6 +244,53 @@ class Util:
         nums = Util.normalize_list(nums, min_score)
         for i in range(len(objs)):
             setattr(objs[i], attr, nums[i])
+
+    @staticmethod
+    def gen_phrases(options):
+        '''
+        Generates an exhaustive list of lists of phrases from the passed
+        list of Options.
+
+        Args:
+            options [Option]
+
+        Returns:
+            [[Phrase]]
+        '''
+        # The recursive method removes from the list, so we copy
+        # references (shallow) first.
+        opt_copy = options[:]
+        return Util._gen_phrases_recursive(opt_copy)
+
+    @staticmethod
+    def _gen_phrases_recursive(todo, results=[]):
+        '''
+        Recursively generates an exhaustive list of lists of phrases
+        from the passed options in todo.
+
+        Note that todo will be mutated (elements will be removed from it
+        until it's empty) so this should be a shallow (ref) copy of any
+        data structure that matters to the caller.
+
+        Args:
+            todo [Option]
+            results ([[Phrase]])
+
+        Returns:
+            [[Phrase]]
+        '''
+        if len(todo) == 0:
+            return results
+        opt = todo.pop(0)
+        next_phrases = opt.get_phrases()
+        if results == []:
+            new_results = next_phrases
+        else:
+            new_results = []
+            for phrase_list in next_phrases:
+                for r in results:
+                    new_results += [r + phrase_list]
+        return Util._gen_phrases_recursive(todo, new_results)
 
 
 class CommandDict:
@@ -447,6 +492,9 @@ class Command:
     Has state: YES
     '''
 
+    # Whether to do some internal checking during each parse.
+    debug = False
+
     def __init__(self, name, option_map, template):
         '''
         Args:
@@ -541,13 +589,13 @@ class Command:
         Checks that numbers are sane. Should be called before apply_l
         (not enforced).
 
-        This does nothing if DEBUG is False.
+        This does nothing if Command.debug is False.
 
         Args:
             commands ([Command])
             sentences ([Sentence])
         '''
-        if not DEBUG:
+        if not Command.debug:
             return
 
         # Ensure command scores are normalized.
@@ -586,39 +634,12 @@ class Command:
             #         % (sum_))
             #     sys.exit(1)
 
-    @staticmethod
-    def _gen_phrases(todo, results=[]):
-        '''
-        Recursively generates an exhaustive list of lists of phrases
-        from the passed options in todo.
-
-        Args:
-            todo [Option]
-            results ([[Phrase]])
-
-        Returns:
-            [[Phrase]]
-        '''
-        if len(todo) == 0:
-            return results
-        opt = todo.pop(0)
-        next_phrases = opt.get_phrases()
-        if results == []:
-            new_results = [[p] for p in next_phrases]
-        else:
-            new_results = []
-            for phrase in next_phrases:
-                for r in results:
-                    new_results += [r + [phrase]]
-        return Command._gen_phrases(todo, new_results)
-
     def generate_sentences(self):
         '''
         Returns:
             [Sentence]
         '''
-        opt_copy = self.option_map.values()[:]  # Just copy all refs.
-        phrase_lists = Command._gen_phrases(opt_copy)
+        phrase_lists = Util.gen_phrases(self.option_map.values())
         return [Sentence(pl) for pl in phrase_lists]
 
     def has_obj_opt(self):
@@ -644,8 +665,12 @@ class Command:
                 has, and each element is a list that contains all of
                 that options' commands.
         '''
-        return [
-            opt.get_phrases() for pname, opt in self.option_map.iteritems()]
+        phrase_sets = []
+        for pname, opt in self.option_map.iteritems():
+            opt_phrase_sets = opt.get_phrases()
+            for phrase in opt_phrase_sets:
+                phrase_sets += [phrase]
+        return phrase_sets
 
     def apply_w(self):
         '''
@@ -871,10 +896,6 @@ class Parameter:
 class Option:
     '''Interface for options.'''
 
-    def get_phrases(self):
-        Error.p("Option:get_phrases unimplemented as it's an interface.")
-        sys.exit(1)
-
     def __repr__(self):
         '''
         Returns:
@@ -882,9 +903,20 @@ class Option:
         '''
         return ''.join(['|', self.name, '|'])
 
+    def get_phrases(self):
+        '''
+        Returns:
+            [[Phrase]]
+        '''
+        Error.p("Option:get_phrases must be implemented by a subclass.")
+        sys.exit(1)
+
     def pure_str(self):
         '''
         Returns the 'cannonical' name of the option.
+
+        Returns:
+            str
         '''
         return self.name
 
@@ -897,7 +929,14 @@ class WordOption(Option):
         self.phrases = phrases
 
     def get_phrases(self):
-        return self.phrases
+        '''
+        Returns a list, where each element is a single-element list of
+        a possible phrase.
+
+        Returns:
+            [[Phrase]]
+        '''
+        return [[p] for p in self.phrases]
 
 
 class ObjectOption(Option):
@@ -982,12 +1021,14 @@ class ObjectOption(Option):
 
     def get_phrases(self):
         '''
+        Returns a list of possible phrases, where each element is a list
+        of Phrases.
+
         Returns:
-            [Phrase]
+            [[Phrase]]
         '''
-        # TODO(mbforbes): Implement this fully using object properties.
-        # CURSPOT
-        return [Phrase(self.name, DefaultMatcher)]
+        return Util.gen_phrases(self.word_options)
+        # return [Phrase(self.name, DefaultMatcher)]  # just use 'objn'
 
 
 class Sentence:
@@ -1271,9 +1312,13 @@ class Parser:
     # Couple settings (currently for debugging)
     display_limit = 8
 
-    def __init__(self, grammar_yaml=COMMAND_GRAMMAR, buffer_printing=False):
+    def __init__(
+            self, grammar_yaml=COMMAND_GRAMMAR, buffer_printing=False,
+            debug=False):
         # If set, logger saves ouput
         Logger.buffer_printing = buffer_printing
+        # If set, do some internal checking during each parse.
+        Command.debug = debug
 
         # Load
         self.command_dict = CommandDict(yaml.load(open(grammar_yaml)))
@@ -1308,7 +1353,7 @@ class Parser:
         '''
         # Provide initial world, robot
         self.set_default_world()
-        utterance = 'move right hand to the right'
+        utterance = 'move right hand up'
         Info.p(self.parse(utterance)[0])
 
     def default_interactive_loop(self):
@@ -1352,7 +1397,7 @@ class Parser:
         self.lock.acquire()
         # The robot must be set to fully update.
         self.world_objects = world_objects
-        if robot is not None:
+        if self.robot is not None:
             self._update_world_internal()
         self.lock.release()
 

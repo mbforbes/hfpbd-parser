@@ -92,6 +92,8 @@ options:
         phrases:
             - pick up
             - grab
+            # For pick ___ up
+            - pick
     place:
         phrases:
             - place
@@ -121,6 +123,9 @@ options:
         phrases:
             - up
             - higher
+            # NOTE(mbforbes): Hack as 'raise' should be a verb, but this
+            # should work given rest of system providing inference.
+            - raise
     down:
         phrases:
             - down
@@ -139,10 +144,12 @@ options:
         phrases:
             - right hand
             - right arm
+            - right gripper
     left_hand:
         phrases:
             - left hand
             - left arm
+            - left gripper
 # Ways we can talk about objects (these are still options).
 # Location
     left_most:
