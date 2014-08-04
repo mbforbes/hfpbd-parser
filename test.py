@@ -24,37 +24,37 @@ from matchers import NotSideMatcher
 
 # Strings (S)
 S_OPEN_CLOSE = {
-    'OPENRIGHT': 'open right hand',
-    'OPENLEFT': 'open left hand',
-    'CLOSERIGHT': 'close right hand',
-    'CLOSELEFT': 'close left hand',
+    'OPENRIGHT': 'open right-hand',
+    'OPENLEFT': 'open left-hand',
+    'CLOSERIGHT': 'close right-hand',
+    'CLOSELEFT': 'close left-hand',
 }
 S_MOVEABS = {
-    'LH_UP': 'move left hand up',
-    'LH_DOWN': 'move left hand down',
-    'LH_LEFT': 'move left hand left',
-    'LH_RIGHT': 'move left hand right',
-    'RH_UP': 'move right hand up',
-    'RH_DOWN': 'move right hand down',
-    'RH_LEFT': 'move right hand left',
-    'RH_RIGHT': 'move right hand right',
+    'LH_UP': 'move left-hand up',
+    'LH_DOWN': 'move left-hand down',
+    'LH_LEFT': 'move left-hand left',
+    'LH_RIGHT': 'move left-hand right',
+    'RH_UP': 'move right-hand up',
+    'RH_DOWN': 'move right-hand down',
+    'RH_LEFT': 'move right-hand left',
+    'RH_RIGHT': 'move right-hand right',
 }
 S_MOVEREL = {
-    'RH_ABOVE': 'move right hand above the red box',
-    'RH_NEXTTO': 'move right hand next to the red box',
-    'LH_ABOVE': 'move left hand above the red box',
-    'LH_NEXTTO': 'move left hand next to the red box',
+    'RH_ABOVE': 'move right-hand above the red box',
+    'RH_NEXTTO': 'move right-hand next-to the red box',
+    'LH_ABOVE': 'move left-hand above the red box',
+    'LH_NEXTTO': 'move left-hand next-to the red box',
 
 }
 S_PICKUP = {
-    'RH': 'pick up the red box with your right hand',
-    'LH': 'pick up the red box with your left hand',
+    'RH': 'pick-up the red box with your right-hand',
+    'LH': 'pick-up the red box with your left-hand',
 }
 S_PLACE = {
-    'PL_RH_ABOVE': 'place above the red box with your right hand',
-    'PL_RH_NEXTTO': 'place next to the red box with your right hand',
-    'PL_LH_ABOVE': 'place above the red box with your left hand',
-    'PL_LH_NEXTTO': 'place next to the red box with your left hand',
+    'PL_RH_ABOVE': 'place above the red box with your right-hand',
+    'PL_RH_NEXTTO': 'place next-to the red box with your right-hand',
+    'PL_LH_ABOVE': 'place above the red box with your left-hand',
+    'PL_LH_NEXTTO': 'place next-to the red box with your left-hand',
 }
 S_LOOKAT = {
     'LOOKAT': 'look at the red box',
@@ -243,9 +243,9 @@ class TestNotSideMatcher(unittest.TestCase):
             self.assertTrue(NotSideMatcher.match(
                 side, side))
             self.assertTrue(NotSideMatcher.match(
-                side, 'move right hand ' + side))
+                side, 'move right-hand ' + side))
             self.assertTrue(NotSideMatcher.match(
-                side, 'move left hand ' + side))
+                side, 'move left-hand ' + side))
             self.assertTrue(NotSideMatcher.match(
                 side, 'move right arm ' + side))
             self.assertTrue(NotSideMatcher.match(
@@ -260,9 +260,6 @@ class FullNoContext(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        # TODO(mbforbes): Remove this once we know it works.
-        print 'Running in debug?', TestUtil.on_travis()
-
         self.parser = Parser(debug=TestUtil.on_travis())
         self.parser.set_world()
 
@@ -317,30 +314,30 @@ class FullOneObjNoRobot(unittest.TestCase):
 
     def test_synonyms(self):
         self.assertEqual(
-            self.parser.parse('open left gripper')[0],
+            self.parser.parse('open left-gripper')[0],
             RC_OPEN_CLOSE['OPENLEFT'])
         self.assertEqual(
-            self.parser.parse('close right gripper')[0],
+            self.parser.parse('close right-gripper')[0],
             RC_OPEN_CLOSE['CLOSERIGHT'])
         self.assertEqual(
-            self.parser.parse('move left arm higher')[0],
+            self.parser.parse('move left-arm higher')[0],
             RC_MOVEABS['LH_UP'])
         self.assertEqual(
-            self.parser.parse('move right gripper to the left')[0],
+            self.parser.parse('move right-gripper to the left')[0],
             RC_MOVEABS['RH_LEFT'])
         self.assertEqual(
-            self.parser.parse('pick the red block up left hand')[0],
+            self.parser.parse('pick the red block up left-hand')[0],
             RC_PICKUP['LH'])
         self.assertEqual(
-            self.parser.parse('pick the red block up right arm')[0],
+            self.parser.parse('pick the red block up right-arm')[0],
             RC_PICKUP['RH'])
 
     def test_missing_words(self):
         self.assertEqual(
-            self.parser.parse('lower left gripper')[0],
+            self.parser.parse('lower left-gripper')[0],
             RC_MOVEABS['LH_DOWN'])
         self.assertEqual(
-            self.parser.parse('raise right gripper')[0],
+            self.parser.parse('raise right-gripper')[0],
             RC_MOVEABS['RH_UP'])
 
     def test_extra_words(self):
@@ -373,13 +370,13 @@ class FullOneObjNoRobot(unittest.TestCase):
 
     def test_obj_desc(self):
         self.assertEqual(
-            self.parser.parse('pick up that thing left hand')[0],
+            self.parser.parse('pick-up that thing left-hand')[0],
             RC_PICKUP['LH'])
         self.assertEqual(
-            self.parser.parse('pick up the box right hand')[0],
+            self.parser.parse('pick-up the box right-hand')[0],
             RC_PICKUP['RH'])
         self.assertEqual(
-            self.parser.parse('pick up the red thing right hand')[0],
+            self.parser.parse('pick-up the red thing right-hand')[0],
             RC_PICKUP['RH'])
 
 
@@ -439,18 +436,18 @@ class FullOneObjRobotSidePref(unittest.TestCase):
             self.parser.parse('move above the box')[0],
             RC_MOVEREL[rc_key_short + '_ABOVE'])
         self.assertEqual(
-            self.parser.parse('move next to the box')[0],
+            self.parser.parse('move next-to the box')[0],
             RC_MOVEREL[rc_key_short + '_NEXTTO'])
 
         # pickup, place
         self.assertEqual(
-            self.parser.parse('pick up')[0],
+            self.parser.parse('pick-up')[0],
             RC_PICKUP[rc_key_short])
         self.assertEqual(
             self.parser.parse('place above the box')[0],
             RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
         self.assertEqual(
-            self.parser.parse('place next to the box')[0],
+            self.parser.parse('place next-to the box')[0],
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
 
 

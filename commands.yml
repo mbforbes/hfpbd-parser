@@ -90,7 +90,7 @@ options:
             - move
     pick_up:
         phrases:
-            - pick up
+            - pick-up
             - grab
             # For pick ___ up
             - pick
@@ -100,9 +100,9 @@ options:
             - put
     look_at:
         phrases:
-            - look at
+            - look-at
             - look
-            - turn your head
+            - turn-your-head
     open:
         phrases:
             - open
@@ -118,7 +118,7 @@ options:
             - above
     next_to:
         phrases:
-            - next to
+            - next-to
     up:
         phrases:
             - up
@@ -132,34 +132,34 @@ options:
             - lower
     to_left:
         phrases:
-            - to the left
+            - to-the-left
             - left
         strategy: notside
     to_right:
         phrases:
-            - to the right
+            - to-the-right
             - right
         strategy: notside
     right_hand:
         phrases:
-            - right hand
-            - right arm
-            - right gripper
+            - right-hand
+            - right-arm
+            - right-gripper
     left_hand:
         phrases:
-            - left hand
-            - left arm
-            - left gripper
+            - left-hand
+            - left-arm
+            - left-gripper
 # Ways we can talk about objects (these are still options).
 # Location
     left_most:
         phrases:
-            - left most
+            - left-most
             - left
         strategy: notside
     right_most:
         phrases:
-            - right most
+            - right-most
             - right
         strategy: notside
     farthest:
