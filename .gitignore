@@ -2,3 +2,4 @@
 .coverage
 htmlcov/
 venv
+sentences.txt

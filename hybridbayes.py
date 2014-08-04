@@ -1055,6 +1055,15 @@ class Sentence:
         phrases = ' '.join(["'" + str(p) + "'" for p in self.phrases])
         return "%0.6f  %s" % (self.score, phrases)
 
+    def get_raw(self):
+        '''
+        Returns just the sentences words as a string
+
+        Returns:
+            str
+        '''
+        return ' '.join(str(p) for p in self.phrases)
+
     def get_phrases(self):
         '''
         Returns:
@@ -1364,6 +1373,48 @@ class Parser:
         self.set_default_world()
         self._interactive_loop()
 
+    def print_sentences(self):
+        '''Prints all sentences to stdout, one per line.'''
+        # Provide initial world, robot
+        Debug.printing = False
+        Info.printing = False
+        self.set_default_world()
+        for sentence in self.sentences:
+            print sentence.get_raw()
+
+    def startup_ros(self):
+        '''ROS-specific: Sets up callbacks for
+            - recognized speech from pocketsphinx
+            - world state updates (TODO)
+            - robot state updates (TODO)
+        and publishers for
+            - HandsFreeCommand
+        '''
+        # Setup default system.
+        self.set_default_world()
+
+        # Setup ROS.
+        import roslib
+        roslib.load_manifest('pr2_pbd_speech_recognition')
+        import rospy
+        from std_msgs.msg import String
+        from pr2_pbd_speech_recognition.msg import HandsFreeCommand
+        rospy.Subscriber('recognizer/output', String, self.sphinx_cb)
+        self.hfcmd_pub = rospy.Publisher('handsfree_command', HandsFreeCommand)
+
+    def sphinx_cb(self, recognized):
+        '''ROS-specific: Callback for when data received from
+        Pocketsphinx.
+
+        Args:
+            recognized (String)
+        '''
+        recog_str = recognized.data
+        robotCommand, buf_log = self.parse(recog_str)
+        hfcmd = HandsFreeCommand(
+            cmd=robotCommand.name, args=robotCommand.args[1:])
+        self.hfcmd_pub.publish(hfcmd)
+
     def _interactive_loop(self):
         '''
         Answers queries using the already-set world objects and robot
@@ -1561,6 +1612,10 @@ def main():
         parser.default_interactive_loop()
     elif arg == 'interactive-simple':
         parser.simple_interactive_loop()
+    elif arg == 'sentences':
+        parser.print_sentences()
+    elif arg == 'ros':
+        parser.rosrun()
     elif arg == '':
         play(parser)
     else:
