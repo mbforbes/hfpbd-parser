@@ -84,40 +84,51 @@ descriptors:
 # options -> phrases
 # These are the spoken utterance options for all commands and options.
 options:
+# verbs
     move_rel:
         phrases:
             - move
+        strategy: verb
     move_abs:
         phrases:
             - move
+        strategy: verb
     pick_up:
         phrases:
             - pick-up
             - grab
             # For pick ___ up
             - pick
+        strategy: verb
     place:
         phrases:
             - place
             - put
+        strategy: verb
     look_at:
         phrases:
             - look-at
             - look
             - turn-your-head
+        strategy: verb
     open:
         phrases:
             - open
             - release
+        strategy: verb
     close:
         phrases:
             - close
+        strategy: verb
     above:
         phrases:
             - above
+        strategy: verb
     next_to:
         phrases:
             - next-to
+        strategy: verb
+# params
     up:
         phrases:
             - up
@@ -133,12 +144,12 @@ options:
         phrases:
             - to-the-left
             - left
-        strategy: notside
+        # strategy: notside
     to_right:
         phrases:
             - to-the-right
             - right
-        strategy: notside
+        # strategy: notside
     right_hand:
         phrases:
             - right-hand
@@ -161,12 +172,12 @@ options:
         phrases:
             - left-most
             - left
-        strategy: notside
+        # strategy: notside
     right_most:
         phrases:
             - right-most
             - right
-        strategy: notside
+        # strategy: notside
     farthest:
         phrases:
             - farthest

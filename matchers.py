@@ -10,6 +10,17 @@ __author__ = 'mbforbes'
 # Builtins
 import sys
 
+# Local
+from util import Debug
+
+
+########################################################################
+# Module-level constants
+########################################################################
+
+LANG_MATCH_VERB_SCORE = 5.0
+LANG_MATCH_PARAM_SCORE = 1.0
+
 
 ########################################################################
 # Classes
@@ -18,10 +29,31 @@ import sys
 class MatchingStrategy:
     '''Interface for matching strategies.'''
 
+    verb_match = LANG_MATCH_VERB_SCORE
+    param_match = LANG_MATCH_PARAM_SCORE
+
     @staticmethod
     def match(words, utterance):
         Error.p("MatchingStrategy:match unimplemented as it's an interface.")
         sys.exit(1)
+
+    @staticmethod
+    def words_in(words, utterance):
+        '''
+        Returns whether all words in words are found somewhere in
+        utterance.
+
+        Args:
+            words (str)
+            utterance (str)
+        '''
+        ret = True
+        pieces = utterance.split(' ')
+        for word in words.split(' '):
+            if word not in pieces:
+                ret = False
+        Debug.pl(3, 'found ' + str(words) + '? ' + str(ret))
+        return ret
 
 
 class DefaultMatcher:
@@ -36,77 +68,40 @@ class DefaultMatcher:
             utterance (str)
 
         Returns:
-            bool
+            float: score
         '''
-        return words in utterance
+        return (
+            MatchingStrategy.param_match
+            if MatchingStrategy.words_in(words, utterance)
+            else 0.0
+        )
 
 
-class NotSideMatcher:
-    '''Matching strategy that avoids matching side utterances.'''
-
-    @staticmethod
-    def find_all(words, utterance):
-        '''
-        Finds all indexes of words in utterance.
-
-        Args:
-            words (str)
-            utterance (str)
-
-        Returns:
-            [int]: indexes
-        '''
-        indexes = []
-        start = 0
-        res = utterance.find(words, start)
-        while res > -1:
-            indexes += [res]
-            start = res + 1
-            res = utterance.find(words, start)
-        return indexes
+class VerbMatcher:
+    '''Default matching strategy.'''
 
     @staticmethod
     def match(words, utterance):
-        '''Returns whether words match an utterance, avoiding side
-        utterances.
+        '''Returns whether words match an utterance. words contains
+        verbs.
 
         Args:
             words (str)
             utterance (str)
 
         Returns:
-            bool
+            float: score
         '''
-        bad_follow_words = ['hand', 'arm', 'gripper']
-        # Get basic test out of the way.
-        if words not in utterance:
-            return False
-
-        # At this point, the words are in the utterance. Check whether
-        # we're really matching the phrase...
-        indexes = NotSideMatcher.find_all(words, utterance)
-
-        all_clear = False
-        for index in indexes:
-            bw_found = False
-            nextidx = index + len(words) + 1  # + 1 for space
-            # If the next word is neither 'hand' nor 'arm', we've
-            # matched NOT one of the side phrases.
-            if nextidx < len(utterance):
-                for bw in bad_follow_words:
-                    possible_bw = utterance[nextidx:nextidx + len(bw)]
-                    if possible_bw == bw:
-                        bw_found = True
-            # If this index has avoided all bad words, we're clear.
-            if not bw_found:
-                all_clear = True
-                break
-        return all_clear
+        return (
+            MatchingStrategy.verb_match
+            if MatchingStrategy.words_in(words, utterance)
+            else 0.0
+        )
 
 
 class Matchers:
     # Indexes into classes
     MATCHERS = {
         'default': DefaultMatcher,
-        'notside': NotSideMatcher
+        'verb': VerbMatcher
     }

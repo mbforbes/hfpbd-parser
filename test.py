@@ -5,6 +5,9 @@ Current test categories include:
     - Full: end-to-end tests (of entire system)
 '''
 
+__author__ = 'mbforbes'
+
+
 # ######################################################################
 # Imports
 # ######################################################################
@@ -15,7 +18,7 @@ import unittest
 
 # Local
 from hybridbayes import Parser, WorldObject, Robot, RobotCommand, Info, Debug
-from matchers import NotSideMatcher
+from matchers import DefaultMatcher
 
 
 # ######################################################################
@@ -86,6 +89,7 @@ RC_MOVEABS = {
         'move_abs', ['right_hand', 'to_right']),
 }
 RC_MOVEREL = {
+    # obj0
     'RH_ABOVE': RobotCommand.from_strs(
         'move_rel', ['right_hand', 'above', 'obj0']),
     'RH_NEXTTO': RobotCommand.from_strs(
@@ -94,15 +98,31 @@ RC_MOVEREL = {
         'move_rel', ['left_hand', 'above', 'obj0']),
     'LH_NEXTTO': RobotCommand.from_strs(
         'move_rel', ['left_hand', 'next_to', 'obj0']),
-
+    # obj1
+    'RH_ABOVE2': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'above', 'obj1']),
+    'RH_NEXTTO2': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'next_to', 'obj1']),
+    'LH_ABOVE2': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'above', 'obj1']),
+    'LH_NEXTTO2': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'next_to', 'obj1']),
 }
 RC_PICKUP = {
+    # obj0
     'RH': RobotCommand.from_strs(
         'pick_up', ['obj0', 'right_hand']),
     'LH': RobotCommand.from_strs(
         'pick_up', ['obj0', 'left_hand']),
+    # obj1
+    'RH2': RobotCommand.from_strs(
+        'pick_up', ['obj1', 'right_hand']),
+    'LH2': RobotCommand.from_strs(
+        'pick_up', ['obj1', 'left_hand']),
+
 }
 RC_PLACE = {
+    # obj0
     'PL_RH_ABOVE': RobotCommand.from_strs(
         'place', ['above', 'obj0', 'right_hand']),
     'PL_RH_NEXTTO': RobotCommand.from_strs(
@@ -111,10 +131,23 @@ RC_PLACE = {
         'place', ['above', 'obj0', 'left_hand']),
     'PL_LH_NEXTTO': RobotCommand.from_strs(
         'place', ['next_to', 'obj0', 'left_hand']),
+    # obj1
+    'PL_RH_ABOVE2': RobotCommand.from_strs(
+        'place', ['above', 'obj1', 'right_hand']),
+    'PL_RH_NEXTTO2': RobotCommand.from_strs(
+        'place', ['next_to', 'obj1', 'right_hand']),
+    'PL_LH_ABOVE2': RobotCommand.from_strs(
+        'place', ['above', 'obj1', 'left_hand']),
+    'PL_LH_NEXTTO2': RobotCommand.from_strs(
+        'place', ['next_to', 'obj1', 'left_hand']),
 }
 RC_LOOKAT = {
+    # obj0
     'LOOKAT': RobotCommand.from_strs(
         'look_at', ['obj0']),
+    # obj1
+    'LOOKAT2': RobotCommand.from_strs(
+        'look_at', ['obj1']),
 }
 
 # Objects (O)
@@ -164,6 +197,25 @@ O_LEFT_POSSIBLE = {
     'type': 'box',
     'has_distinct_type': True,
 }
+# Has different properties than the first fully reachable object.
+O_FULL_REACHABLE_SECOND = {
+    'name': 'obj1',
+    # Relation to arms.
+    'is_pickupable': [True, True],
+    'is_above_reachable': [True, True],
+    'is_nextto_reachable': [True, True],
+    # Relation to other objects. These should be more general.
+    'is_leftmost': False,
+    'is_righttmost': False,
+    'is_biggest': False,
+    'is_smallest': False,
+    # E.g. red, blue, green, unknown
+    'color': 'blue',
+    'has_distinct_color': True,
+    # E.g. cup, box, unknown
+    'type': 'cup',
+    'has_distinct_type': True,
+}
 
 # Robot properties (R)
 R_RIGHT_PREF = {
@@ -202,58 +254,22 @@ class TestUtil:
         return getpass.getuser() == 'travis'
 
 
-class TestNotSideMatcher(unittest.TestCase):
-    def test_unmatches(self):
-        sides = ['right', 'left']
-        for i, side in enumerate(sides):
-            self.assertFalse(NotSideMatcher.match(
-                side, side + ' hand'))
-            self.assertFalse(NotSideMatcher.match(
-                side, side + ' arm'))
-            self.assertFalse(NotSideMatcher.match(
-                side, side + ' gripper'))
-            self.assertFalse(NotSideMatcher.match(
-                side, side + ' arm ' + side + ' hand'))
-            self.assertFalse(NotSideMatcher.match(
-                side, side + ' arm ' + side + ' gripper'))
-            self.assertFalse(NotSideMatcher.match(
-                side, side + ' hand ' + side + ' arm'))
-            self.assertFalse(NotSideMatcher.match(
-                side, side + ' hand ' + side + ' gripper'))
-            self.assertFalse(NotSideMatcher.match(
-                side, side + ' gripper ' + side + ' hand'))
-            self.assertFalse(NotSideMatcher.match(
-                side, side + ' gripper ' + side + ' arm'))
+class TestDefaultMatcher(unittest.TestCase):
+    def test_part_of_words(self):
+        self.assertEqual(DefaultMatcher.match('up', 'cup'), 0.0)
 
-    def test_matches(self):
-        sides = ['right', 'left']
-        for i, side in enumerate(sides):
-            self.assertTrue(NotSideMatcher.match(
-                side, side + ' ' + side + ' hand'))
-            self.assertTrue(NotSideMatcher.match(
-                side, side + ' ' + side + ' gripper'))
-            self.assertTrue(NotSideMatcher.match(
-                side, side + ' ' + side + ' arm'))
-            self.assertTrue(NotSideMatcher.match(
-                side, side + ' hand ' + side))
-            self.assertTrue(NotSideMatcher.match(
-                side, side + ' gripper ' + side))
-            self.assertTrue(NotSideMatcher.match(
-                side, side + ' arm ' + side))
-            self.assertTrue(NotSideMatcher.match(
-                side, side))
-            self.assertTrue(NotSideMatcher.match(
-                side, 'move right-hand ' + side))
-            self.assertTrue(NotSideMatcher.match(
-                side, 'move left-hand ' + side))
-            self.assertTrue(NotSideMatcher.match(
-                side, 'move right arm ' + side))
-            self.assertTrue(NotSideMatcher.match(
-                side, 'move left arm ' + side))
-            self.assertTrue(NotSideMatcher.match(
-                side, 'move right gripper ' + side))
-            self.assertTrue(NotSideMatcher.match(
-                side, 'move left gripper ' + side))
+    def test_basic_params(self):
+        self.assertNotEqual(DefaultMatcher.match(
+            'down', 'move left-hand down'), 0.0)
+
+    def test_side_unmatches(self):
+        self.assertEqual(DefaultMatcher.match('right', 'right-hand'), 0.0)
+
+    def test_side_matches(self):
+        self.assertNotEqual(DefaultMatcher.match(
+            'right-hand', 'right-hand'), 0.0)
+        self.assertNotEqual(DefaultMatcher.match(
+            'right', 'right-hand right'), 0.0)
 
 
 class FullNoContext(unittest.TestCase):
@@ -340,6 +356,9 @@ class FullOneObjNoRobot(unittest.TestCase):
             self.parser.parse('raise right-gripper')[0],
             RC_MOVEABS['RH_UP'])
 
+    @unittest.skipIf(
+        not TestUtil.on_travis(),
+        "Test is slow and more of sanity check; OK to run only on Travis.")
     def test_extra_words(self):
         # Collect all strs
         all_strs = {}
@@ -492,17 +511,191 @@ class FullRobotOneSidePossible(unittest.TestCase):
             self.parser.parse('move right')[0],
             RC_MOVEABS[rc_key_short + '_RIGHT'])
 
-# TODO
-# class FullObjectOneSidePossible(unittest.TestCase):
 
-# TODO
-# class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
+class FullObjectOneSidePossible(unittest.TestCase):
+    def setUp(self):
+        Info.printing = False
+        Debug.printing = False
+        self.parser = Parser(debug=TestUtil.on_travis())
 
-# TODO
-# class FullObjectDescripers
+    def test_only_right_possible(self):
+        # Trying with no robot; focus is on OBJECT state.
+        self.parser.set_world(world_objects=[WorldObject(O_RIGHT_POSSIBLE)])
+        self._check_object_side('right_hand')
 
-# TODO
-# class FullMultiObjects
+    def test_only_left_possible(self):
+        # Trying with no robot; focus is on OBJECT state.
+        self.parser.set_world(world_objects=[WorldObject(O_LEFT_POSSIBLE)])
+        self._check_object_side('left_hand')
+
+    def _check_object_side(self, side_rc):
+        '''
+        Args:
+            side_rc: 'right_hand' or 'left_hand'
+        '''
+        # calculate keys for RC maps
+        rc_key_long = 'RIGHT' if side_rc == 'right_hand' else 'LEFT'
+        rc_key_short = 'RH' if side_rc == 'right_hand' else 'LH'
+
+        # moverel
+        self.assertEqual(
+            self.parser.parse('move above the red box')[0],
+            RC_MOVEREL[rc_key_short + '_ABOVE'])
+        self.assertEqual(
+            self.parser.parse('move next-to the red box')[0],
+            RC_MOVEREL[rc_key_short + '_NEXTTO'])
+
+        # pickup
+        self.assertEqual(
+            self.parser.parse('pick-up the red box')[0],
+            RC_PICKUP[rc_key_short])
+
+        # place
+        self.assertEqual(
+            self.parser.parse('place above the red box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
+        self.assertEqual(
+            self.parser.parse('place next-to the red box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
+
+
+class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
+    def setUp(self):
+        Info.printing = False
+        Debug.printing = False
+        self.parser = Parser(debug=TestUtil.on_travis())
+        objs = [WorldObject(O_FULL_REACHABLE)]
+        # NOTE: Only 'update objects' called; this ensures we must
+        # update the robot in each test method before the parser will
+        # run (as we want both to be specified). We could call 'set
+        # world' instead but this ensures we write the tests correctly.
+        self.parser.update_objects(world_objects=objs)
+
+    def test_left_preferred_right_requested(self):
+        self.parser.update_robot(Robot(R_LEFT_PREF))
+        self._check_side_requested('right_hand')
+
+    def test_right_preferred_left_requested(self):
+        self.parser.update_robot(Robot(R_RIGHT_PREF))
+        self._check_side_requested('left_hand')
+
+    def _check_side_requested(self, side_rc):
+        '''
+        Args:
+            side_rc: 'right_hand' or 'left_hand'
+        '''
+        # Make request str
+        side_req = 'right-hand' if side_rc == 'right_hand' else 'left-hand'
+
+        # calculate keys for RC maps
+        rc_key_long = 'RIGHT' if side_rc == 'right_hand' else 'LEFT'
+        rc_key_short = 'RH' if side_rc == 'right_hand' else 'LH'
+
+        # open / close
+        self.assertEqual(
+            self.parser.parse('open ' + side_req)[0],
+            RC_OPEN_CLOSE['OPEN' + rc_key_long])
+        self.assertEqual(
+            self.parser.parse('close ' + side_req)[0],
+            RC_OPEN_CLOSE['CLOSE' + rc_key_long])
+
+        # moveabs
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' up')[0],
+            RC_MOVEABS[rc_key_short + '_UP'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' down')[0],
+            RC_MOVEABS[rc_key_short + '_DOWN'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' left')[0],
+            RC_MOVEABS[rc_key_short + '_LEFT'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' right')[0],
+            RC_MOVEABS[rc_key_short + '_RIGHT'])
+
+        # moverel
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' above the box')[0],
+            RC_MOVEREL[rc_key_short + '_ABOVE'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' next-to the box')[0],
+            RC_MOVEREL[rc_key_short + '_NEXTTO'])
+
+        # pickup, place
+        self.assertEqual(
+            self.parser.parse('pick-up with ' + side_req)[0],
+            RC_PICKUP[rc_key_short])
+        self.assertEqual(
+            self.parser.parse('place above the box with ' + side_req)[0],
+            RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
+        self.assertEqual(
+            self.parser.parse('place next-to the box with ' + side_req)[0],
+            RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
+
+
+class FullMultiObjectsSimple(unittest.TestCase):
+    def setUp(self):
+        Info.printing = False
+        Debug.printing = False
+        self.parser = Parser(debug=TestUtil.on_travis())
+        objs = [
+            WorldObject(O_FULL_REACHABLE),  # obj0
+            WorldObject(O_FULL_REACHABLE_SECOND),  # obj1
+        ]
+        self.parser.set_world(world_objects=objs)
+
+    def test_select_obj0(self):
+        print 'testing selecting obj0'
+        hands = ['right_hand', 'left_hand']
+        descs = ['red box', 'red thing', 'red object', 'box', 'crimson box']
+        for hand in hands:
+            for desc in descs:
+                self._check_object(hand, 'obj0', desc)
+
+    def test_select_obj1(self):
+        print 'testing selecting obj1'
+        hands = ['right_hand', 'left_hand']
+        descs = ['blue cup', 'blue thing', 'blue object', 'cup']
+        for hand in hands:
+            for desc in descs:
+                self._check_object(hand, 'obj1', desc)
+
+    def _check_object(self, side_rc, obj_str, desc):
+        '''
+        Args:
+            side_rc (str): 'right_hand' or 'left_hand'
+            obj_str (str): 'obj0' or 'obj1'
+            desc (str): Descriptor for the object
+
+        '''
+        # calculate keys for RC maps
+        hand_str = 'right-hand' if side_rc == 'right_hand' else 'left-hand'
+        rc_key_long = 'RIGHT' if side_rc == 'right_hand' else 'LEFT'
+        rc_key_short = 'RH' if side_rc == 'right_hand' else 'LH'
+        objkey = '2' if obj_str == 'obj1' else ''
+
+        # moverel
+        self.assertEqual(
+            self.parser.parse('move ' + hand_str + ' above the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_ABOVE' + objkey])
+        self.assertEqual(
+            self.parser.parse('move ' + hand_str + ' next-to the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_NEXTTO' + objkey])
+
+        # pickup
+        self.assertEqual(
+            self.parser.parse('pick-up the ' + desc + ' with ' + hand_str)[0],
+            RC_PICKUP[rc_key_short + objkey])
+
+        # place
+        self.assertEqual(
+            self.parser.parse(
+                'place above the ' + desc + ' with ' + hand_str)[0],
+            RC_PLACE['PL_' + rc_key_short + '_ABOVE' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place next-to the ' + desc + ' with ' + hand_str)[0],
+            RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
 
 # TODO: Cases where you ask it to pick up an object and neither hand
 #       can. The idea is the language should be 'so heavily weighted'
@@ -510,6 +703,13 @@ class FullRobotOneSidePossible(unittest.TestCase):
 #       as requested and just say it can't do it. (I think this is a job
 #       for the robot).
 # class FullImpossibleCommands
+
+
+# TODO: This is where we really test the tuning of the system. We need
+#       to have the weights such that impossible AND unpreferred
+#       commands are still returned if the person said them. This
+#       reduces the inference to essentially filling in the gaps.
+# class FullImpossibleUnpreferredCommands
 
 
 # ######################################################################

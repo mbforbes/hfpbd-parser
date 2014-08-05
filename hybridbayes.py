@@ -33,6 +33,7 @@ Here's the process:
 
 __author__ = 'mbforbes'
 
+
 ########################################################################
 # Imports
 ########################################################################
@@ -47,22 +48,18 @@ import threading
 import yaml
 
 # Local
-from matchers import DefaultMatcher, NotSideMatcher, Matchers
+from util import Logger, Error, Info, Debug, Numbers
+from matchers import DefaultMatcher, MatchingStrategy, Matchers
+
 
 ########################################################################
 # Module-level constants
 ########################################################################
 
 # Global options
-ERROR_PRINTING_DEFAULT = True
-INFO_PRINTING_DEFAULT = True
-DEBUG_PRINTING_DEFAULT = True
-
 COMMAND_GRAMMAR = 'commands.yml'
 WORLD = 'world.yml'
 OBJ_PARAM = 'obj'
-
-FLOAT_COMPARE_EPSILON = 0.001
 
 # How to index into object properties by side
 SIDES = yaml.load(open(COMMAND_GRAMMAR))['parameters']['side']
@@ -99,199 +96,20 @@ M_WO = {
 
 # Command score
 START_SCORE = 0.0  # To begin with. Maybe doesn't matter.
-MIN_SCORE = 0.1  # Minimum score for normalizing. Only adds to match.
 P_LOCUNR = -5.0  # Penalty: the requested location is unreachable.
 P_OBJUNR = -5.0  # Penalty: the requested object cannot be picked up.
-P_NOTLASTSIDE = -1.0  # Penalty: the side wasn't the last commanded.
+P_NOTLASTSIDE = -0.1  # Penalty: the side wasn't the last commanded.
 P_GSTATE = -8.0  # Penalty: nonsensical gripper state change requested.
 P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 
 # Language score
+LANG_WEIGHT = 2.0  # How much to weight rel. to cmd (cmd wegiht = 1.0)
 LANG_MATCH_START = 0.1
-LANG_MATCH_SCORE = 22.0
-LANG_UNMATCH_SCORE = 0.0
-CMD_PHRASE_MATCH_START = 0.1
-CMD_PHRASE_MATCH_CMD = 1.0  # Maximum given for matching command options.
-CMD_PHRASE_MATCH_PHRASE = 1.0  # Maximum given for matching utterance phrases.
-# CMD_PHRASE_MATCH_SCORE = 20.0
-# CMD_PHRASE_UNMATCH_SCORE = -10.0
 
 
 ########################################################################
 # Classes
 ########################################################################
-
-class Logger:
-    buffer_printing = False
-    printing = False
-    prefix = '[IMPLEMENT ME]'
-    print_buffer = []
-
-    @classmethod
-    def p(cls, obj):
-        cls.pl(0, obj)
-
-    @classmethod
-    def pl(cls, level, obj):
-        '''
-        Args:
-            level (int): how many tabs (one space if 0)
-            obj (Object): what to print
-        '''
-        string = str(obj)
-        if cls.printing:
-            # tab = '\t'  # use for 'normal' tabs
-            tab = '  '  # use for 'space' tabs (adjust as needed)
-            indent = ' ' if level == 0 else tab * (level + 1)
-            output = ''.join([cls.prefix, indent, string])
-            if Logger.buffer_printing:
-                # Save for later
-                Logger.print_buffer += [output]
-            else:
-                print output
-
-    @staticmethod
-    def get_buffer():
-        '''
-        Empties and returns buffer.
-
-        Returns:
-            str
-        '''
-        retstr = '\n'.join(Logger.print_buffer)
-        Logger.print_buffer = []
-        return retstr
-
-
-# Error
-class Error(Logger):
-    printing = ERROR_PRINTING_DEFAULT
-    prefix = '[ERROR]'
-
-
-# Debugging
-class Info(Logger):
-    printing = INFO_PRINTING_DEFAULT
-    prefix = '[INFO]'
-
-
-# Debugging
-class Debug(Logger):
-    printing = DEBUG_PRINTING_DEFAULT
-    prefix = '[DEBUG]'
-
-
-class Util:
-    '''
-    Misc. helper functionality.
-    '''
-
-    @staticmethod
-    def are_floats_close(a, b, epsilon=FLOAT_COMPARE_EPSILON):
-        '''Checks whether two floats are within epsilon of each other.
-
-        Args:
-            a (float): One number.
-            b (float): The other number.
-            epsilon (float): Acceptable wiggle room (+/-) between a and
-                b.
-
-        Returns:
-            bool: Whether a and b are within epsilon of each other.
-        '''
-        # We try to do this in an overflow-friendly way, though it
-        # probably isn't a big deal with our use cases and python.
-        return a - epsilon <= b if a > b else b - epsilon <= a
-
-    @staticmethod
-    def normalize_list(nums, min_score=MIN_SCORE):
-        '''
-        Normalizes list of floats to a valid probability distribution.
-
-        Args:
-            nums ([float]):
-            min_score (float, optional): The lowest score to boost
-                objects to (all objects are boosted uniformly). Defaults
-                to MIN_SCORE.
-
-        Returns:
-            [float]
-        '''
-        # First, boost all to some minimum value.
-        min_ = min(nums)
-        boost = MIN_SCORE - min_ if MIN_SCORE > min_ else 0.0
-        nums = [n + boost for n in nums]
-
-        # Next, do the normalization.
-        sum_ = sum(nums)
-        return [n / sum_ for n in nums]
-
-    @staticmethod
-    def normalize(objs, attr='score', min_score=MIN_SCORE):
-        '''
-        Normalizes list of objects with a attr attribute (that is a
-        float) to a valid probability distribution.
-
-        Args:
-            objs ([Object]): List of Objects
-            attr (str, optional): The name of the attribute to extract
-                from objects. Defaults to 'score'.
-            min_score (float, optional): The lowest score to boost
-                objects to (all objects are boosted uniformly). Defaults
-                to MIN_SCORE.
-        '''
-        nums = [getattr(obj, attr) for obj in objs]
-        nums = Util.normalize_list(nums, min_score)
-        for i in range(len(objs)):
-            setattr(objs[i], attr, nums[i])
-
-    @staticmethod
-    def gen_phrases(options):
-        '''
-        Generates an exhaustive list of lists of phrases from the passed
-        list of Options.
-
-        Args:
-            options [Option]
-
-        Returns:
-            [[Phrase]]
-        '''
-        # The recursive method removes from the list, so we copy
-        # references (shallow) first.
-        opt_copy = options[:]
-        return Util._gen_phrases_recursive(opt_copy)
-
-    @staticmethod
-    def _gen_phrases_recursive(todo, results=[]):
-        '''
-        Recursively generates an exhaustive list of lists of phrases
-        from the passed options in todo.
-
-        Note that todo will be mutated (elements will be removed from it
-        until it's empty) so this should be a shallow (ref) copy of any
-        data structure that matters to the caller.
-
-        Args:
-            todo [Option]
-            results ([[Phrase]])
-
-        Returns:
-            [[Phrase]]
-        '''
-        if len(todo) == 0:
-            return results
-        opt = todo.pop(0)
-        next_phrases = opt.get_phrases()
-        if results == []:
-            new_results = next_phrases
-        else:
-            new_results = []
-            for phrase_list in next_phrases:
-                for r in results:
-                    new_results += [r + phrase_list]
-        return Util._gen_phrases_recursive(todo, new_results)
-
 
 class CommandDict:
     '''The Python representation of our YAML-defined commands file.'''
@@ -377,8 +195,8 @@ class CommandDict:
     def _make_options(self, wobjs):
         '''
         Args:
-            wobjs ([WorldObject]): The object we see in the world (or
-                from a YAML file).
+            wobjs ([WorldObject]): The object wes see in the world (or
+                from a YAML file or python dict).
 
         Returns:
             {str: Option}: Map of option name: Option.
@@ -391,6 +209,8 @@ class CommandDict:
             if 'strategy' in props:
                 matcher_name = props['strategy']
                 matcher = Matchers.MATCHERS[matcher_name]
+            else:
+                matcher = Matchers.MATCHERS['default']
 
             # Get phrases
             raw_phrases = props['phrases']
@@ -600,13 +420,13 @@ class Command:
 
         # Ensure command scores are normalized.
         sum_ = sum(c.score for c in commands)
-        if not Util.are_floats_close(sum_, 1.0):
+        if not Numbers.are_floats_close(sum_, 1.0):
             Error.p('Command scores are not normed: %0.3f' % (sum_))
             sys.exit(1)
 
         # Ensure sentence scores normalized.
         # sum_ = sum(s.score for s in sentences)
-        # if not Util.are_floats_close(sum_, 1.0):
+        # if not Numbers.are_floats_close(sum_, 1.0):
         #     Error.p('Sentence scores are not normed: %0.3f' % (sum_))
         #     sys.exit(1)
 
@@ -628,7 +448,7 @@ class Command:
             # # Ensure sentence match scores normalized.
             # sum_ = sum(
             #     p for s, p in c.sentence_match_probs.iteritems())
-            # if not Util.are_floats_close(sum_, 1.0):
+            # if not Numbers.are_floats_close(sum_, 1.0):
             #     Error.p(
             #         'Command sentence_match_probs not normed: %0.3f'
             #         % (sum_))
@@ -639,7 +459,7 @@ class Command:
         Returns:
             [Sentence]
         '''
-        phrase_lists = Util.gen_phrases(self.option_map.values())
+        phrase_lists = Numbers.gen_phrases(self.option_map.values())
         return [Sentence(pl) for pl in phrase_lists]
 
     def has_obj_opt(self):
@@ -799,9 +619,10 @@ class Command:
             self.sentence_match_probs = {}
 
         scores = []
+        kvs = []  # Debug
         phrase_sets = self.get_phrase_sets()
         for sentence in sentences:
-            score = CMD_PHRASE_MATCH_START
+            score = 0.0
             s_phrases = sentence.get_phrases()
 
             # We simply count the phrase matches. We want to penalize
@@ -812,35 +633,59 @@ class Command:
             # Check whether any phrase for each command option in
             # sentence phrases.
             n_opts = len(phrase_sets)
-            n_matches = 0
-            for phrase_set in phrase_sets:
+            match_score = 0.0
+            for idx, phrase_set in enumerate(phrase_sets):
                 for phrase in phrase_set:
+                    # The following uses Phrase's __eq__ method.
                     if phrase in s_phrases:
-                        n_matches += 1
+                        # Verbs get a different score than params.
+                        if idx == 0:
+                            match_score += MatchingStrategy.verb_match
+                        else:
+                            match_score += MatchingStrategy.param_match
                         break
-            score += (n_matches / n_opts) * CMD_PHRASE_MATCH_CMD
+            max_match_score = (
+                MatchingStrategy.verb_match +
+                (n_opts - 1) * MatchingStrategy.param_match)
+            score += match_score / max_match_score
 
             # Check each phrase in the sentence's phrases.
             n_phrases = len(s_phrases)
-            n_matches = 0
-            for s_phrase in s_phrases:
+            match_score = 0.0
+            for idx, s_phrase in enumerate(s_phrases):
                 for phrase_set in phrase_sets:
+                    # The following uses Phrase's __eq__ method.
                     if s_phrase in phrase_set:
-                        n_matches += 1
+                        # Verbs get a different score than params.
+                        if idx == 0:
+                            match_score += MatchingStrategy.verb_match
+                        else:
+                            match_score += MatchingStrategy.param_match
                         break
-            score += (n_matches / n_phrases) * CMD_PHRASE_MATCH_PHRASE
+            max_match_score = (
+                MatchingStrategy.verb_match +
+                (n_phrases - 1) * MatchingStrategy.param_match)
+            score += match_score / max_match_score
 
             scores += [score]
             # Debug.pl(1, '%0.2f %s' % (score, str(sentence)))
 
         # Normalize, save
-        scores = Util.normalize_list(scores)
+        # TODO(mbforbe): Put in constants if these work.
+        min_ = 0.1
+        scale = 2.0
+        scores = Numbers.normalize_list(scores, min_, scale)
         for idx, sentence in enumerate(sentences):
             self.sentence_match_probs[sentence] = scores[idx]
+            kvs += [(scores[idx], sentence)]
 
         # Debug
-        # Debug.p(
-        #     'Sentence-matching scores for command: ' + str(self.pure_str()))
+        Debug.p(
+            'Sentence-matching scores for command: ' + str(self.pure_str()))
+        skvs = sorted(kvs, key=lambda x: -x[0])
+        for kv in skvs:
+            Debug.pl(1, "%0.3f %s" % (kv[0], kv[1]))
+
         # all_scores = self.sentence_match_probs.values()
         # all_scores = list(reversed(sorted(all_scores)))
         # all_scores = ['%0.5f' % (s) for s in all_scores]
@@ -872,7 +717,8 @@ class Command:
 
         The result is stored in self.final_p.
         '''
-        self.final_p = self.score * self.lang_score
+        # self.final_p = self.score * self.lang_score  # original
+        self.final_p = self.score + self.lang_score * LANG_WEIGHT  # new
 
 
 class Parameter:
@@ -1027,7 +873,7 @@ class ObjectOption(Option):
         Returns:
             [[Phrase]]
         '''
-        return Util.gen_phrases(self.word_options)
+        return Numbers.gen_phrases(self.word_options)
         # return [Phrase(self.name, DefaultMatcher)]  # just use 'objn'
 
 
@@ -1077,17 +923,22 @@ class Sentence:
             utterance (str)
         '''
         total_score = 0.0
-        # Debug.pl(1, "Scoring sentence: " + str(self))
+        Debug.pl(1, "Scoring sentence: " + str(self))
         for phrase in self.phrases:
             phrase_score = phrase.score(utterance)
-            # Debug.pl(
-            #     2,
-            #     "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
+            Debug.pl(
+                2,
+                "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
             total_score += phrase_score
 
-        # We currently weight the scores by the max.
-        max_score = len(self.phrases) * LANG_MATCH_SCORE
+        # Option 1: Weight the scores by the max.
+        max_score = (
+            MatchingStrategy.verb_match +
+            (len(self.phrases) - 1) * MatchingStrategy.param_match)
         self.score = LANG_MATCH_START + total_score / max_score
+
+        # Option 2: Just use the raw score?
+        # self.score = total_score
 
 
 class Phrase:
@@ -1111,10 +962,8 @@ class Phrase:
         Returns:
             float
         '''
-        if self.strategy.match(self.words, utterance):
-            return LANG_MATCH_SCORE
-        else:
-            return LANG_UNMATCH_SCORE
+        Debug.pl(2, 'Matching with ' + str(self.strategy))
+        return self.strategy.match(self.words, utterance)
 
     def __repr__(self):
         '''
@@ -1329,7 +1178,7 @@ class RobotCommand:
 class Parser:
 
     # Couple settings (currently for debugging)
-    display_limit = 8
+    display_limit = 25
 
     def __init__(
             self, grammar_yaml=COMMAND_GRAMMAR, buffer_printing=False,
@@ -1364,7 +1213,7 @@ class Parser:
         Answers queries using no world objects and no robot state.
         '''
         self.set_world()
-        self._interactive_loop()
+        self.interactive_loop()
 
     def run_default_query(self):
         '''
@@ -1381,13 +1230,18 @@ class Parser:
         '''
         # Provide initial world, robot
         self.set_default_world()
-        self._interactive_loop()
+        self.interactive_loop()
 
     def print_sentences(self):
         '''Prints all sentences to stdout, one per line.'''
         # Provide initial world, robot
         Debug.printing = False
         Info.printing = False
+        # NOTE(mbforbes): Because sentences can only be generated after
+        # we know about the objects that we have in the world, if we
+        # want to truly exhaustively generate all possible sentences
+        # here then we must exhaustively generate all possible objects
+        # first. Should there be a helper function that does that?
         self.set_default_world()
         for sentence in self.sentences:
             print sentence.get_raw()
@@ -1430,7 +1284,7 @@ class Parser:
         robotCommand, buf_log = self.parse(recog_str)
         self.hfcmd_pub.publish(robotCommand.to_rosmsg())
 
-    def _interactive_loop(self):
+    def interactive_loop(self):
         '''
         Answers queries using the already-set world objects and robot
         state.
@@ -1502,18 +1356,19 @@ class Parser:
         # Score sentences.
         for s in self.sentences:
             s.score_match(utterance)
-        # Util.normalize(self.sentences)
+        Numbers.boost(self.sentences)
 
         # Apply L.
         Command.apply_l_precheck(self.commands, self.sentences)
         for c in self.commands:
             c.apply_l(self.sentences)
-        # Util.normalize(self.commands, 'lang_score', 0.0)
+        Numbers.boost(self.commands, 'lang_score')  # boost? or
+        # Numbers.normalize(self.commands, 'lang_score', 0.0)  # norm?
 
         # Get combined probability.
         for c in self.commands:
             c.get_final_p()
-        Util.normalize(self.commands, 'final_p', 0.0)
+        # Numbers.normalize(self.commands, 'final_p', 0.0)  # norm?
 
         # Display sentences.
         self.sentences = sorted(self.sentences, key=lambda x: -x.score)
@@ -1580,7 +1435,7 @@ class Parser:
         for c in self.commands:
             c.apply_w()
             c.apply_r(self.robot)
-        Util.normalize(self.commands)
+        Numbers.normalize(self.commands)
 
         # Pre-score commands with all possible sentences.
         for c in self.commands:
@@ -1612,7 +1467,63 @@ def play(parser):
     Args:
         parser (Parser): Just initialized to the grammar, un-query'd.
     '''
-    pass
+    o_right_possible = {
+        'name': 'obj0',
+        # Relation to arms.
+        'is_pickupable': [True, False],
+        'is_above_reachable': [True, False],
+        'is_nextto_reachable': [True, False],
+        # E.g. red, blue, green, unknown
+        'color': 'red',
+        'has_distinct_color': True,
+        # E.g. cup, box, unknown
+        'type': 'box',
+        'has_distinct_type': True,
+    }
+    o_full_reachable = {
+        'name': 'obj0',
+        # Relation to arms.
+        'is_pickupable': [True, True],
+        'is_above_reachable': [True, True],
+        'is_nextto_reachable': [True, True],
+        # Relation to other objects. These should be more general.
+        'is_leftmost': False,
+        'is_righttmost': False,
+        'is_biggest': False,
+        'is_smallest': False,
+        # E.g. red, blue, green, unknown
+        'color': 'red',
+        'has_distinct_color': True,
+        # E.g. cup, box, unknown
+        'type': 'box',
+        'has_distinct_type': True,
+    }
+    o_full_reachable_second = {
+        'name': 'obj1',
+        # Relation to arms.
+        'is_pickupable': [True, True],
+        'is_above_reachable': [True, True],
+        'is_nextto_reachable': [True, True],
+        # Relation to other objects. These should be more general.
+        'is_leftmost': False,
+        'is_righttmost': False,
+        'is_biggest': False,
+        'is_smallest': False,
+        # E.g. red, blue, green, unknown
+        'color': 'blue',
+        'has_distinct_color': True,
+        # E.g. cup, box, unknown
+        'type': 'cup',
+    }
+    objs = [
+        # WorldObject(o_full_reachable),
+        WorldObject(o_full_reachable_second),
+    ]
+
+    parser.set_world(world_objects=objs)
+    # parser.print_sentences()
+    # parser.update_robot(robot=Robot({'last_cmd_side': 'left_hand'}))
+    parser.interactive_loop()
 
 
 def main():
@@ -1631,7 +1542,7 @@ def main():
         parser.print_sentences()
     elif arg == 'ros':
         parser.startup_ros()
-    elif arg == '':
+    elif arg == 'play':
         play(parser)
     else:
         Error.p("Unknown option: " + arg)
