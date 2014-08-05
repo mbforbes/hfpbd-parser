@@ -1288,6 +1288,16 @@ class RobotCommand:
         '''
         return RobotCommand(name, args)
 
+    def to_rosmsg(self):
+        '''
+        Returns ROS representation of this command.
+        '''
+        from pr2_pbd_interaction.msg import HandsFreeCommand
+        return HandsFreeCommand(
+            cmd=self.name,
+            args=self.args
+        )
+
     def __eq__(self, other):
         '''
         Args:
@@ -1391,16 +1401,18 @@ class Parser:
             - HandsFreeCommand
         '''
         # Setup default system.
-        self.set_default_world()
+        self.set_world()
 
         # Setup ROS.
         import roslib
-        roslib.load_manifest('pr2_pbd_speech_recognition')
+        roslib.load_manifest('pr2_pbd_interaction')
         import rospy
         from std_msgs.msg import String
-        from pr2_pbd_speech_recognition.msg import HandsFreeCommand
+        from pr2_pbd_interaction.msg import HandsFreeCommand
+        rospy.init_node('hfpbd_parser')
         rospy.Subscriber('recognizer/output', String, self.sphinx_cb)
         self.hfcmd_pub = rospy.Publisher('handsfree_command', HandsFreeCommand)
+        rospy.spin()
 
     def sphinx_cb(self, recognized):
         '''ROS-specific: Callback for when data received from
@@ -1409,11 +1421,14 @@ class Parser:
         Args:
             recognized (String)
         '''
+        # Ensure we actually got something.
         recog_str = recognized.data
+        if len(recog_str.strip()) == 0:
+            return
+
+        # Parse and respond!
         robotCommand, buf_log = self.parse(recog_str)
-        hfcmd = HandsFreeCommand(
-            cmd=robotCommand.name, args=robotCommand.args[1:])
-        self.hfcmd_pub.publish(hfcmd)
+        self.hfcmd_pub.publish(robotCommand.to_rosmsg())
 
     def _interactive_loop(self):
         '''
@@ -1615,7 +1630,7 @@ def main():
     elif arg == 'sentences':
         parser.print_sentences()
     elif arg == 'ros':
-        parser.rosrun()
+        parser.startup_ros()
     elif arg == '':
         play(parser)
     else:

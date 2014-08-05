@@ -28,8 +28,10 @@ commands:
     close:
         - close
         - side
-    save:
-        - save
+    execute:
+        - execute
+    stop:
+        - stop
 
 # parameters -> options
 # These specify the options for the parameters of the command
@@ -110,9 +112,6 @@ options:
     close:
         phrases:
             - close
-    save:
-        phrases:
-            - save
     above:
         phrases:
             - above
@@ -150,6 +149,12 @@ options:
             - left-hand
             - left-arm
             - left-gripper
+    execute:
+        phrases:
+            - execute
+    stop:
+        phrases:
+            - stop
 # Ways we can talk about objects (these are still options).
 # Location
     left_most:
