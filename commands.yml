@@ -120,15 +120,21 @@ options:
         phrases:
             - close
         strategy: verb
+    execute:
+        phrases:
+            - execute
+        strategy: verb
+    stop:
+        phrases:
+            - stop
+        strategy: verb
+# params
     above:
         phrases:
             - above
-        strategy: verb
     next_to:
         phrases:
             - next-to
-        strategy: verb
-# params
     up:
         phrases:
             - up
@@ -160,12 +166,6 @@ options:
             - left-hand
             - left-arm
             - left-gripper
-    execute:
-        phrases:
-            - execute
-    stop:
-        phrases:
-            - stop
 # Ways we can talk about objects (these are still options).
 # Location
     left_most:
@@ -212,13 +212,14 @@ options:
         phrases:
             - box
             - cube
-            # - thing
-            # - object
+            - thing
+            - object
     cup:
         phrases:
             - cup
-            # - thing
-            # - object
+            - glass
+            - thing
+            - object
     unknown:
         phrases:
             - thing

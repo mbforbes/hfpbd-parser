@@ -94,8 +94,12 @@ M_WO = {
     'is_smallest': 'smallest',
 }
 
+# General scoring
+LENGTH_EXP = 10.0  # Polynomial degree for weight by length (x^this).
+
 # Command score
 START_SCORE = 1.0  # To begin with. Maybe doesn't matter.
+MIN_SCORE = 0.1  # What to boost scores to *before* normalizing.
 P_LOCUNR = -5.0  # Penalty: the requested location is unreachable.
 P_OBJUNR = -5.0  # Penalty: the requested object cannot be picked up.
 P_NOTLASTSIDE = -0.1  # Penalty: the side wasn't the last commanded.
@@ -103,8 +107,9 @@ P_GSTATE = -8.0  # Penalty: nonsensical gripper state change requested.
 P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 
 # Language score
+
+# Combined Score
 LANG_WEIGHT = 2.0  # How much to weight rel. to cmd (cmd wegiht = 1.0)
-LENGTH_EXP = 10.0  # How to weight by length (curve = x^this).
 
 
 ########################################################################
@@ -926,16 +931,18 @@ class Sentence:
         # Debug.pl(1, "Scoring sentence: " + str(self))
         for phrase in self.phrases:
             phrase_score = phrase.score(utterance)
+            total_score += phrase_score
+            # Debug
             # Debug.pl(
             #     2,
             #     "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
-            total_score += phrase_score
 
         # Option 1: Weight the scores by the max (i.e. the length).
         max_score = (
             MatchingStrategy.verb_match +
             (len(self.phrases) - 1) * MatchingStrategy.param_match)
         self.score = (total_score / max_score)**LENGTH_EXP
+        # Debug.pl(2, "Final score: " + str(self))
 
         # Option 2: Just use the raw score?
         # self.score = total_score
@@ -1435,7 +1442,7 @@ class Parser:
         for c in self.commands:
             c.apply_w()
             c.apply_r(self.robot)
-        Numbers.normalize(self.commands)
+        Numbers.normalize(self.commands, min_score=MIN_SCORE)
 
         # Pre-score commands with all possible sentences.
         for c in self.commands:
@@ -1473,51 +1480,33 @@ def play(parser):
         'is_pickupable': [True, False],
         'is_above_reachable': [True, False],
         'is_nextto_reachable': [True, False],
-        # E.g. red, blue, green, unknown
-        'color': 'red',
-        'has_distinct_color': True,
-        # E.g. cup, box, unknown
-        'type': 'box',
-        'has_distinct_type': True,
-    }
-    o_full_reachable = {
-        'name': 'obj0',
-        # Relation to arms.
-        'is_pickupable': [True, True],
-        'is_above_reachable': [True, True],
-        'is_nextto_reachable': [True, True],
-        # Relation to other objects. These should be more general.
         'is_leftmost': False,
-        'is_righttmost': False,
+        'is_righttmost': True,
         'is_biggest': False,
-        'is_smallest': False,
+        'is_smallest': True,
         # E.g. red, blue, green, unknown
         'color': 'red',
-        'has_distinct_color': True,
         # E.g. cup, box, unknown
         'type': 'box',
-        'has_distinct_type': True,
     }
-    o_full_reachable_second = {
+    o_left_possible_second = {
         'name': 'obj1',
         # Relation to arms.
-        'is_pickupable': [True, True],
-        'is_above_reachable': [True, True],
-        'is_nextto_reachable': [True, True],
-        # Relation to other objects. These should be more general.
-        'is_leftmost': False,
+        'is_pickupable': [False, True],
+        'is_above_reachable': [False, True],
+        'is_nextto_reachable': [False, True],
+        'is_leftmost': True,
         'is_righttmost': False,
-        'is_biggest': False,
+        'is_biggest': True,
         'is_smallest': False,
         # E.g. red, blue, green, unknown
-        'color': 'blue',
-        'has_distinct_color': True,
+        'color': 'red',
         # E.g. cup, box, unknown
-        'type': 'cup',
+        'type': 'box',
     }
     objs = [
-        WorldObject(o_full_reachable),
-        WorldObject(o_full_reachable_second),
+        WorldObject(o_right_possible),
+        WorldObject(o_left_possible_second),
     ]
 
     parser.set_world(world_objects=objs)

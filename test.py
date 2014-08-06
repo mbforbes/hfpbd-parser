@@ -164,26 +164,27 @@ O_FULL_REACHABLE = {
     'is_smallest': False,
     # E.g. red, blue, green, unknown
     'color': 'red',
-    'has_distinct_color': True,
     # E.g. cup, box, unknown
     'type': 'box',
-    'has_distinct_type': True,
 }
 
-# Only the one side is 'possible', where applicable.
+# Only right side is 'possible', where applicable. (also, smallest.
 O_RIGHT_POSSIBLE = {
     'name': 'obj0',
     # Relation to arms.
     'is_pickupable': [True, False],
     'is_above_reachable': [True, False],
     'is_nextto_reachable': [True, False],
+    'is_leftmost': False,
+    'is_righttmost': True,
+    'is_biggest': False,
+    'is_smallest': True,
     # E.g. red, blue, green, unknown
     'color': 'red',
-    'has_distinct_color': True,
     # E.g. cup, box, unknown
     'type': 'box',
-    'has_distinct_type': True,
 }
+# Only left side possible where applicable.
 O_LEFT_POSSIBLE = {
     'name': 'obj0',
     # Relation to arms.
@@ -192,12 +193,27 @@ O_LEFT_POSSIBLE = {
     'is_nextto_reachable': [False, True],
     # E.g. red, blue, green, unknown
     'color': 'red',
-    'has_distinct_color': True,
     # E.g. cup, box, unknown
     'type': 'box',
-    'has_distinct_type': True,
 }
-# Has different properties than the first fully reachable object.
+# Has different name than first left-possible object. (also, biggest)
+O_LEFT_POSSIBLE_SECOND = {
+    'name': 'obj1',
+    # Relation to arms.
+    'is_pickupable': [False, True],
+    'is_above_reachable': [False, True],
+    'is_nextto_reachable': [False, True],
+    'is_leftmost': True,
+    'is_righttmost': False,
+    'is_biggest': True,
+    'is_smallest': False,
+    # E.g. red, blue, green, unknown
+    'color': 'red',
+    # E.g. cup, box, unknown
+    'type': 'box',
+}
+# Has different properties (name, color, type) than the first fully-
+# reachable object.
 O_FULL_REACHABLE_SECOND = {
     'name': 'obj1',
     # Relation to arms.
@@ -211,10 +227,8 @@ O_FULL_REACHABLE_SECOND = {
     'is_smallest': False,
     # E.g. red, blue, green, unknown
     'color': 'blue',
-    'has_distinct_color': True,
     # E.g. cup, box, unknown
     'type': 'cup',
-    'has_distinct_type': True,
 }
 
 # Robot properties (R)
@@ -694,6 +708,73 @@ class FullMultiObjectsSimple(unittest.TestCase):
             self.parser.parse(
                 'place next-to the ' + desc + ' with ' + hand_str)[0],
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
+
+
+class FullMultiObjectsPickHand(unittest.TestCase):
+    def setUp(self):
+        Info.printing = False
+        Debug.printing = False
+        self.parser = Parser(debug=TestUtil.on_travis())
+        objs = [
+            WorldObject(O_RIGHT_POSSIBLE),  # obj0
+            WorldObject(O_LEFT_POSSIBLE_SECOND),  # obj1
+        ]
+        self.parser.set_world(world_objects=objs)
+
+    def test_pick_right(self):
+        descs = [
+            'smallest red box',
+            'right-most red box',
+            'smallest thing',
+            'right-most thing'
+        ]
+        for desc in descs:
+            self._check_object('right_hand', 'obj0', desc)
+
+    def test_pick_left(self):
+        descs = [
+            'biggest box',
+            'left-most box',
+            'biggest thing',
+            'left-most thing'
+        ]
+        for desc in descs:
+            self._check_object('left_hand', 'obj1', desc)
+
+    def _check_object(self, side_rc, obj_str, desc):
+        '''
+        Args:
+            side_rc (str): 'right_hand' or 'left_hand'
+            obj_str (str): 'obj0' or 'obj1'
+            desc (str): Descriptor for the object
+
+        '''
+        # calculate keys for RC maps
+        rc_key_long = 'RIGHT' if side_rc == 'right_hand' else 'LEFT'
+        rc_key_short = 'RH' if side_rc == 'right_hand' else 'LH'
+        objkey = '2' if obj_str == 'obj1' else ''
+
+        # moverel
+        self.assertEqual(
+            self.parser.parse('move above the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_ABOVE' + objkey])
+        self.assertEqual(
+            self.parser.parse('move next-to the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_NEXTTO' + objkey])
+
+        # pickup
+        self.assertEqual(
+            self.parser.parse('pick-up the ' + desc)[0],
+            RC_PICKUP[rc_key_short + objkey])
+
+        # place
+        self.assertEqual(
+            self.parser.parse('place above the ' + desc)[0],
+            RC_PLACE['PL_' + rc_key_short + '_ABOVE' + objkey])
+        self.assertEqual(
+            self.parser.parse('place next-to the ' + desc)[0],
+            RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
+
 
 # TODO: Cases where you ask it to pick up an object and neither hand
 #       can. The idea is the language should be 'so heavily weighted'
