@@ -586,7 +586,7 @@ class Command:
             gs = robot.get_property('gripper_states')[side_idx]
             if self.name == 'open':
                 if gs == 'open':
-                    c.score += P_GSTATE
+                    self.score += P_GSTATE
             if self.name == 'close':
                 if gs == 'closed_empty' or gs == 'has_obj':
                     self.score += P_GSTATE

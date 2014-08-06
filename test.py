@@ -230,6 +230,23 @@ O_FULL_REACHABLE_SECOND = {
     # E.g. cup, box, unknown
     'type': 'cup',
 }
+# Noting can reach it!
+O_IMPOSSIBLE = {
+    'name': 'obj0',
+    # Relation to arms.
+    'is_pickupable': [False, False],
+    'is_above_reachable': [False, False],
+    'is_nextto_reachable': [False, False],
+    # Relation to other objects. These should be more general.
+    'is_leftmost': False,
+    'is_righttmost': False,
+    'is_biggest': False,
+    'is_smallest': False,
+    # E.g. red, blue, green, unknown
+    'color': 'red',
+    # E.g. cup, box, unknown
+    'type': 'box',
+}
 
 # Robot properties (R)
 R_RIGHT_PREF = {
@@ -245,12 +262,17 @@ R_ONLY_RIGHT_POSSIBLE = {
     'can_move_toleft': [True, False],
     'can_move_toright': [True, False],
 }
-
 R_ONLY_LEFT_POSSIBLE = {
     'can_move_up': [False, True],
     'can_move_down': [False, True],
     'can_move_toleft': [False, True],
     'can_move_toright': [False, True],
+}
+R_NEITHER_POSSIBLE = {
+    'can_move_up': [False, False],
+    'can_move_down': [False, False],
+    'can_move_toleft': [False, False],
+    'can_move_toright': [False, False],
 }
 
 
@@ -265,7 +287,12 @@ class TestUtil:
         Returns:
             bool: Whether we're running on Travis-CI
         '''
-        return getpass.getuser() == 'travis'
+        # NOTE(mbforbes): Disabling for now as system is running so
+        # slowly with thousands of sentences that travis thinks it's
+        # crashed if we have debugging on.
+        return False
+        # True "on travis?" test:
+        # return getpass.getuser() == 'travis'
 
 
 class TestDefaultMatcher(unittest.TestCase):
@@ -302,6 +329,59 @@ class FullNoContext(unittest.TestCase):
         for cmd in S_MOVEABS.iterkeys():
             self.assertEqual(self.parser.parse(
                 S_MOVEABS[cmd])[0], RC_MOVEABS[cmd])
+
+
+class FullInferOpenClose(unittest.TestCase):
+    def setUp(self):
+        Info.printing = False
+        Debug.printing = False
+        self.parser = Parser(debug=TestUtil.on_travis())
+
+    def test_pick_open(self):
+        # We're going to weight against the last commanded side.
+        robot = Robot({
+            'gripper_states': ['closed_empty', 'open'],
+            'last_cmd_side': 'left_hand',
+        })
+        self.parser.set_world(robot=robot)
+        self.assertEqual(
+            self.parser.parse('open')[0],
+            RC_OPEN_CLOSE['OPENRIGHT']
+        )
+
+        # We're going to weight against the last commanded side.
+        robot = Robot({
+            'gripper_states': ['open', 'has_obj'],
+            'last_cmd_side': 'right_hand',
+        })
+        self.parser.set_world(robot=robot)
+        self.assertEqual(
+            self.parser.parse('release')[0],
+            RC_OPEN_CLOSE['OPENLEFT']
+        )
+
+    def test_pick_close(self):
+        # We're going to weight against the last commanded side.
+        robot = Robot({
+            'gripper_states': ['closed_empty', 'open'],
+            'last_cmd_side': 'right_hand',
+        })
+        self.parser.set_world(robot=robot)
+        self.assertEqual(
+            self.parser.parse('close')[0],
+            RC_OPEN_CLOSE['CLOSELEFT']
+        )
+
+        # We're going to weight against the last commanded side.
+        robot = Robot({
+            'gripper_states': ['open', 'has_obj'],
+            'last_cmd_side': 'left_hand',
+        })
+        self.parser.set_world(robot=robot)
+        self.assertEqual(
+            self.parser.parse('close')[0],
+            RC_OPEN_CLOSE['CLOSERIGHT']
+        )
 
 
 class FullOneObjNoRobot(unittest.TestCase):
@@ -776,12 +856,86 @@ class FullMultiObjectsPickHand(unittest.TestCase):
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
 
 
-# TODO: Cases where you ask it to pick up an object and neither hand
-#       can. The idea is the language should be 'so heavily weighted'
-#       that either the robot, or our model, should accept the command
-#       as requested and just say it can't do it. (I think this is a job
-#       for the robot).
-# class FullImpossibleCommands
+class FullImpossibleRobotCommands:
+    '''
+    Cases where you ask it to move in some way and neither hand can. The
+    idea is the language should be 'so heavily weighted' that either the
+    robot, or our model, should accept the command as requested and just
+    say it can't do it. (I think this is a job for the robot).
+    '''
+
+    def setUp(self):
+        Info.printing = False
+        Debug.printing = False
+        self.parser = Parser(debug=TestUtil.on_travis())
+
+    def test_impossible_openclose(self):
+        robot = Robot({
+            'gripper_states': ['closed_empty', 'open'],
+            'last_cmd_side': 'right_hand',
+        })
+        self.parser.set_world(robot=robot)
+        self.assertEqual(
+            self.parser.parse('open left-hand')[0],
+            RC_OPEN_CLOSE['OPENLEFT']
+        )
+        self.assertEqual(
+            self.parser.parse('close right-hand')[0],
+            RC_OPEN_CLOSE['CLOSERIGHT']
+        )
+
+        robot = Robot({
+            'gripper_states': ['open', 'has_obj'],
+            'last_cmd_side': 'left_hand',
+        })
+        self.parser.set_world(robot=robot)
+        self.assertEqual(
+            self.parser.parse('release right-hand')[0],
+            RC_OPEN_CLOSE['OPENRIGHT']
+        )
+        self.assertEqual(
+            self.parser.parse('close left-hand')[0],
+            RC_OPEN_CLOSE['CLOSELEFT']
+        )
+
+    def test_moveabs(self):
+        self.parser.set_world(robot=Robot(R_NEITHER_POSSIBLE))
+        for cmd in S_MOVEABS.iterkeys():
+            self.assertEqual(self.parser.parse(
+                S_MOVEABS[cmd])[0], RC_MOVEABS[cmd])
+
+
+class FullImpossibleObjCommands:
+    '''
+    Cases where you ask it to pick up an object and neither hand can.
+    The idea is the language should be 'so heavily weighted' that either
+    the robot, or our model, should accept the command as requested and
+    just say it can't do it. (I think this is a job for the robot).
+    '''
+
+    def setUp(self):
+        Info.printing = False
+        Debug.printing = False
+        self.parser = Parser(debug=TestUtil.on_travis())
+        objs = [
+            WorldObject(O_IMPOSSIBLE),  # obj0
+        ]
+        self.parser.set_world(world_objects=objs)
+
+    def test_moverel(self):
+        for cmd in S_MOVEREL.iterkeys():
+            self.assertEqual(self.parser.parse(
+                S_MOVEREL[cmd])[0], RC_MOVEREL[cmd])
+
+    def test_pickup(self):
+        for cmd in S_PICKUP.iterkeys():
+            self.assertEqual(self.parser.parse(
+                S_PICKUP[cmd])[0], RC_PICKUP[cmd])
+
+    def test_place(self):
+        for cmd in S_PLACE.iterkeys():
+            self.assertEqual(self.parser.parse(
+                S_PLACE[cmd])[0], RC_PLACE[cmd])
 
 
 # TODO: This is where we really test the tuning of the system. We need
