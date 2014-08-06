@@ -28,10 +28,17 @@ commands:
     close:
         - close
         - side
+    # 'Admin' commands
     execute:
         - execute
     stop:
         - stop
+    create_new_action:
+        - create_new_action
+    switch_action:
+        - switch_to
+        - which
+        - action
 
 # parameters -> options
 # These specify the options for the parameters of the command
@@ -61,6 +68,9 @@ parameters:
     side:
         - right_hand
         - left_hand
+    which:
+        - next
+        - previous
 # Ways we can talk about objects. These serve as filters to select the
 # options below (they aren't loaded like parameters). Otherwise, these
 # are similar to parameters in that they map to options.
@@ -128,6 +138,14 @@ options:
         phrases:
             - stop
         strategy: verb
+    create_new_action:
+        phrases:
+            - create_new_action
+        strategy: verb
+    switch_to:
+        phrases:
+            - switch-to
+        strategy: verb
 # params
     above:
         phrases:
@@ -166,6 +184,19 @@ options:
             - left-hand
             - left-arm
             - left-gripper
+    next:
+        phrases:
+            - next
+            - the-next
+    previous:
+        phrases:
+            - previous
+            - the-previous
+    action:
+        phrases:
+            - action
+            - skill
+            - program
 # Ways we can talk about objects (these are still options).
 # Location
     left_most:

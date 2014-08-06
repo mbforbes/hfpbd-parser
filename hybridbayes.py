@@ -1006,6 +1006,10 @@ class WorldObject:
     Can be robot or YAML-loaded.
     '''
 
+    # Properties that must match for objects to be considered matching
+    # (for the purposes of sentence generation).
+    matching_properties = ['name', 'color', 'type']
+
     def __init__(self, properties=None):
         '''
         Use from_dicts if calling from yaml-loaded list of property
@@ -1014,6 +1018,15 @@ class WorldObject:
         if properties is None:
             properties = {}
         self.properties = properties
+
+    def __repr__(self):
+        '''
+        Returns:
+            str
+        '''
+        return (
+            self.get_property('name') if self.has_property('name')
+            else 'unknownObj')
 
     @staticmethod
     def from_dicts(objs):
@@ -1031,6 +1044,58 @@ class WorldObject:
             [WorldObject]
         '''
         return [WorldObject(obj_dict) for obj_dict in objs]
+
+    @staticmethod
+    def from_ros(world_objects):
+        '''
+        Args:
+            world_objects (WorldObjects):ROS-msg format WorldObjects.
+
+        Returns:
+            [WorldObject]: Array of our own WorldObject format.
+        '''
+        wobjs = []
+        # rwo = ros world object
+        for rwo in world_objects.world_objects:
+            # Each object here is a WorldObject (as in WorldObject.msg).
+            # This was kind of a bad decision in class names, sorry.
+            # However, we're not explicitly importing it, so it should
+            # be fine.
+            #
+            # Our task for each object from ROS is to see if a property
+            # is really set. If it's not, we just won't include it in
+            # our internal representation. The accessors we provide
+            # check for property existence, so this is the correct way
+            # (rather than copying dummy values).
+
+            # The following are always set (or their default values are
+            # such that we can't check).
+            obj = {
+                'name': rwo.name,
+                'is_leftmost': rwo.is_leftmost,
+                'is_rightmost': rwo.is_rightmost,
+                'is_farthest': rwo.is_farthest,
+                'is_nearest': rwo.is_nearest,
+                'is_biggest': rwo.is_biggest,
+                'is_smallest': rwo.is_smallest,
+            }
+
+            # The following may or may not be set.
+            if len(rwo.color) > 0:
+                obj['color'] = rwo.color
+            if len(rwo.type) > 0:
+                obj['type'] = rwo.type
+
+            # The following may or may not be set, and they are arrays.
+            if len(rwo.is_pickupable) == 2:
+                obj['is_pickupable'] = rwo.is_pickupable
+            if len(rwo.is_above_reachable) == 2:
+                obj['is_above_reachable'] = rwo.is_above_reachable
+            if len(rwo.is_nextto_reachable) == 2:
+                obj['is_nextto_reachable'] = rwo.is_nextto_reachable
+
+            wobjs += [WorldObject(obj)]
+        return wobjs
 
     def has_property(self, name):
         '''
@@ -1053,6 +1118,38 @@ class WorldObject:
         '''
         return self.properties[name]
 
+    def matches_for_generation(self, other):
+        '''
+        Returns whether self matches other enough that sentences do not
+        have to be re-generated.
+
+        Args:
+            other (WorldObject)
+
+        Returns
+            bool
+        '''
+        for prop in WorldObject.matching_properties:
+            if not self.property_match(other, prop):
+                return False
+        return True
+
+    def property_match(self, other, prop):
+        '''
+        Returns whether a property matches in two WorldObjects.
+
+        Args:
+            other (WorldObject)
+            prop (str)
+
+        Returns:
+            bool
+        '''
+        return (
+            self.has_property(prop) and
+            other.has_property(prop) and
+            self.get_property(prop) == other.get_property(prop))
+
 
 class Robot:
     '''
@@ -1073,6 +1170,38 @@ class Robot:
         if properties is None:
             properties = {}
         self.properties = properties
+
+    @staticmethod
+    def from_ros(self, robot_state):
+        '''
+        Args:
+            robot_state (RobotState): From ROS.
+
+        Returns:
+            Robot
+        '''
+        props = {}
+
+        # Check properties before adding.
+        if len(robot_state.last_cmd_side) > 0:
+            props['last_cmd_side'] = robot_state.last_cmd_side
+
+        if len(robot_state.gripper_states) == 2:
+            props['gripper_states'] = robot_state.gripper_states
+
+        if len(robot_state.can_move_up) == 2:
+            props['can_move_up'] = robot_state.can_move_up
+
+        if len(robot_state.can_move_down) == 2:
+            props['can_move_down'] = robot_state.can_move_down
+
+        if len(robot_state.can_move_toleft) == 2:
+            props['can_move_toleft'] = robot_state.can_move_toleft
+
+        if len(robot_state.can_move_toright) == 2:
+            props['can_move_toright'] = robot_state.can_move_toright
+
+        return Robot(props)
 
     def has_property(self, name):
         '''
@@ -1203,6 +1332,7 @@ class Parser:
 
         # Initialize (for clarity)
         self.world_objects = None
+        self.world_objects_for_generation = None
         self.robot = None
         self.templates = None
         self.commands = None
@@ -1268,10 +1398,21 @@ class Parser:
         roslib.load_manifest('pr2_pbd_interaction')
         import rospy
         from std_msgs.msg import String
-        from pr2_pbd_interaction.msg import HandsFreeCommand
+        from pr2_pbd_interaction.msg import (
+            HandsFreeCommand, WorldObjects, RobotState)
         rospy.init_node('hfpbd_parser')
+
+        # We get: speech, world objects, robot state.
         rospy.Subscriber('recognizer/output', String, self.sphinx_cb)
+        rospy.Subscriber(
+            'handsfree_worldobjects', WorldObjects, self.world_objects_cb)
+        rospy.Subscriber(
+            'handsfree_robotstate', RobotState, self.robot_state_cb)
+
+        # We send: parsed commands.
         self.hfcmd_pub = rospy.Publisher('handsfree_command', HandsFreeCommand)
+
+        # Don't die!
         rospy.spin()
 
     def sphinx_cb(self, recognized):
@@ -1289,6 +1430,24 @@ class Parser:
         # Parse and respond!
         robotCommand, buf_log = self.parse(recog_str)
         self.hfcmd_pub.publish(robotCommand.to_rosmsg())
+
+    def world_objects_cb(self, world_objects):
+        '''ROS-specific: Callback for when world objects are received
+        from the robot.
+
+        Args:
+            world_objects (WorldObjects)
+        '''
+        self.update_objects(WorldObject.from_ros(world_objects))
+
+    def robot_state_cb(self, robot_state):
+        '''ROS-specific: Callback for when robot state is received from
+        the robot.
+
+        Args:
+            robot_state (RobotState)
+        '''
+        self.update_robot(Robot.from_ros(robot_state))
 
     def interactive_loop(self):
         '''
@@ -1421,7 +1580,31 @@ class Parser:
             - self.world_objects ([WorldObject])
             - self.robot (Robot)
         '''
+        self._update_world_internal_generate()
+        self._update_world_internal_score()
+        self.start_buffer = self.get_print_buffer()
+
+    def _update_world_internal_generate(self):
+        '''
+        This part generates all templates (phrases, options, commands,
+        sentences) and takes a long time. It doesn't apply the world
+        objects or robot to the prior scores. This only needs to happen
+        when the world objects change in a significant way (i.e. they
+        are different objects, not just differently reachable). This is
+        because the sentences that the same objects generate won't
+        change if only their reachability and location, not their
+        properties, have changed.
+        '''
+        # First, see whether we need to do this at all.
+        if Parser._check_objects_match(
+                self.world_objects, self.world_objects_for_generation):
+            Info.p("Objects match; not re-generating.")
+            return
+        else:
+            Info.p("Objects do not match; re-generating.")
+
         # Make templates (this extracts options and params).
+        self.world_objects_for_generation = self.world_objects
         self.templates = self.command_dict.make_templates(self.world_objects)
         Debug.p('Templates:')
         for t in self.templates:
@@ -1438,15 +1621,83 @@ class Parser:
         self.sentences = [i for s in self.sentences for i in s]  # Flatten.
         Info.p("Sentences: " + str(len(self.sentences)))
 
+        # Pre-score commands with all possible sentences.
+        for c in self.commands:
+            c.score_match_sentences(self.sentences)  # Auto-normalizes.
+
+    @staticmethod
+    def _check_objects_match(objs1, objs2):
+        '''
+        Returns whether two sets of WorldObjects would generate the same
+        sentences, and thus new sentence generation is not required.
+
+        Args:
+            objs1 ([WorldObject]|None): List of WorldObjects. Can be
+                None or empty.
+            objs2 ([WorldObject]|None): List of WorldObjects. Can be
+                None or empty.
+
+        Returns:
+            bool
+        '''
+        if objs1 is None and objs2 is None:
+            return True
+
+        if ((objs1 is None and objs2 is not None) or
+                (objs1 is not None and objs2 is None)):
+            Debug.p('Objects mismatch: only one list is not none.')
+            return False
+
+        if len(objs1) != len(objs2):
+            Debug.p('Objects mismatch: lengths do not match.')
+            return False
+
+        if len(objs1) == 0 and len(objs2) == 0:
+            return True
+
+        # If we've come this far, there are two non-empty object lists,
+        # and we need to see whether each contains one in the other.
+        # Checking one way is not sufficient in general, in case one has
+        # duplicate types of objects and the other does not.
+        return (
+            Parser._check_objects_found_in(objs1, objs2) and
+            Parser._check_objects_found_in(objs2, objs1))
+
+    @staticmethod
+    def _check_objects_found_in(objs1, objs2):
+        '''
+        Returns whether each of objs1 is found in objs2.
+
+        Args:
+            objs1 ([WorldObject]): Non-empty list of WorldObjects.
+            objs2 ([WorldObject]): Non-empty list of WorldObjects.
+
+        Returns:
+            bool
+        '''
+        # Debug.p('Checking ' + str(objs1) + ' vs ' + str(objs2))
+        for obj1 in objs1:
+            match_found = False
+            for obj2 in objs2:
+                if obj1.matches_for_generation(obj2):
+                    match_found = True
+                    break
+            if not match_found:
+                # Debug.p('Could not find ' + str(obj1) + ' in ' + str(objs2))
+                return False
+        return True
+
+    def _update_world_internal_score(self):
+        '''
+        This part applies the world objects and robot to the score. It
+        is relatively fast. This alone can be called if the world
+        objects are identicial in core properties.
+        '''
         # Apply W and R to weight C prior.
         for c in self.commands:
             c.apply_w()
             c.apply_r(self.robot)
         Numbers.normalize(self.commands, min_score=MIN_SCORE)
-
-        # Pre-score commands with all possible sentences.
-        for c in self.commands:
-            c.score_match_sentences(self.sentences)  # Auto-normalizes.
 
         # Display commands.
         self.commands = sorted(self.commands, key=lambda x: -x.score)
@@ -1457,8 +1708,6 @@ class Parser:
                 Info.pl(1, c)
             ptot += c.score
         Info.p('Total (%d): %0.2f' % (len(self.commands), ptot))
-
-        self.start_buffer = self.get_print_buffer()
 
 
 ########################################################################
@@ -1506,12 +1755,13 @@ def play(parser):
     }
     objs = [
         WorldObject(o_right_possible),
-        WorldObject(o_left_possible_second),
+        # WorldObject(o_left_possible_second),
     ]
 
     parser.set_world(world_objects=objs)
     # parser.print_sentences()
-    # parser.update_robot(robot=Robot({'last_cmd_side': 'left_hand'}))
+    parser.update_robot(robot=Robot({'last_cmd_side': 'left_hand'}))
+    parser.set_world(world_objects=objs)
     parser.interactive_loop()
 
 
