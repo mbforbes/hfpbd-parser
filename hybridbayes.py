@@ -95,7 +95,7 @@ M_WO = {
 }
 
 # Command score
-START_SCORE = 0.0  # To begin with. Maybe doesn't matter.
+START_SCORE = 1.0  # To begin with. Maybe doesn't matter.
 P_LOCUNR = -5.0  # Penalty: the requested location is unreachable.
 P_OBJUNR = -5.0  # Penalty: the requested object cannot be picked up.
 P_NOTLASTSIDE = -0.1  # Penalty: the side wasn't the last commanded.
@@ -104,7 +104,7 @@ P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 
 # Language score
 LANG_WEIGHT = 2.0  # How much to weight rel. to cmd (cmd wegiht = 1.0)
-LANG_MATCH_START = 0.1
+LENGTH_EXP = 10.0  # How to weight by length (curve = x^this).
 
 
 ########################################################################
@@ -619,7 +619,7 @@ class Command:
             self.sentence_match_probs = {}
 
         scores = []
-        kvs = []  # Debug
+        # kvs = []  # Debug
         phrase_sets = self.get_phrase_sets()
         for sentence in sentences:
             score = 0.0
@@ -647,7 +647,7 @@ class Command:
             max_match_score = (
                 MatchingStrategy.verb_match +
                 (n_opts - 1) * MatchingStrategy.param_match)
-            score += match_score / max_match_score
+            score += (match_score / max_match_score)**LENGTH_EXP
 
             # Check each phrase in the sentence's phrases.
             n_phrases = len(s_phrases)
@@ -665,36 +665,23 @@ class Command:
             max_match_score = (
                 MatchingStrategy.verb_match +
                 (n_phrases - 1) * MatchingStrategy.param_match)
-            score += match_score / max_match_score
+            score += (match_score / max_match_score)**LENGTH_EXP
 
             scores += [score]
-            # Debug.pl(1, '%0.2f %s' % (score, str(sentence)))
+            # Debug.pl(1, '%0.10f %s' % (score, str(sentence.get_raw())))
 
         # Normalize, save
-        # TODO(mbforbe): Put in constants if these work.
-        min_ = 0.1
-        scale = 2.0
-        scores = Numbers.normalize_list(scores, min_, scale)
+        norm_scores = Numbers.normalize_list(scores, 0.1, 2.0)
         for idx, sentence in enumerate(sentences):
-            self.sentence_match_probs[sentence] = scores[idx]
-            kvs += [(scores[idx], sentence)]
+            self.sentence_match_probs[sentence] = norm_scores[idx]
+            # kvs += [(norm_scores[idx], scores[idx], sentence.get_raw())]
 
         # Debug
-        Debug.p(
-            'Sentence-matching scores for command: ' + str(self.pure_str()))
-        skvs = sorted(kvs, key=lambda x: -x[0])
-        for kv in skvs:
-            Debug.pl(1, "%0.3f %s" % (kv[0], kv[1]))
-
-        # all_scores = self.sentence_match_probs.values()
-        # all_scores = list(reversed(sorted(all_scores)))
-        # all_scores = ['%0.5f' % (s) for s in all_scores]
-        # Debug.pl(1, "Top %d:" % (display_limit))
-        # for ts in  all_scores[:display_limit]:
-        #     Debug.pl(2, ts)
-        # Debug.pl(1, "Bottom %d:" % (display_limit))
-        # for bs in  all_scores[-display_limit:]:
-        #     Debug.pl(2, bs)
+        # Debug.p(
+        #     'Sentence-matching scores for command: ' + str(self.pure_str()))
+        # skvs = sorted(kvs, key=lambda x: -x[0])
+        # for kv in skvs:
+        #     Debug.pl(1, "%0.3f %0.3f %s" % (kv[0], kv[1], kv[2]))
 
     def apply_l(self, sentences):
         '''
@@ -706,8 +693,21 @@ class Command:
             sentences ([Sentence])
         '''
         score_total = 0.0
+        # Debug.pl(0, 'Scoring %s' % (str(self)))
         for s in sentences:
-            score_total += s.score * self.sentence_match_probs[s]
+            inc = s.score * self.sentence_match_probs[s]
+            score_total += inc
+            # Debug.pl(
+            #     1,
+            #     'Tot: %0.3f, adding %0.3f = %0.3f x %0.3f from %s' % (
+            #         score_total,
+            #         inc,
+            #         self.sentence_match_probs[s],
+            #         s.score,
+            #         s.get_raw()
+            #     )
+            # )
+        # Debug.pl(1, 'Total: %0.3f' % (score_total))
         self.lang_score = score_total
 
     def get_final_p(self):
@@ -923,19 +923,19 @@ class Sentence:
             utterance (str)
         '''
         total_score = 0.0
-        Debug.pl(1, "Scoring sentence: " + str(self))
+        # Debug.pl(1, "Scoring sentence: " + str(self))
         for phrase in self.phrases:
             phrase_score = phrase.score(utterance)
-            Debug.pl(
-                2,
-                "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
+            # Debug.pl(
+            #     2,
+            #     "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
             total_score += phrase_score
 
-        # Option 1: Weight the scores by the max.
+        # Option 1: Weight the scores by the max (i.e. the length).
         max_score = (
             MatchingStrategy.verb_match +
             (len(self.phrases) - 1) * MatchingStrategy.param_match)
-        self.score = LANG_MATCH_START + total_score / max_score
+        self.score = (total_score / max_score)**LENGTH_EXP
 
         # Option 2: Just use the raw score?
         # self.score = total_score
@@ -962,7 +962,6 @@ class Phrase:
         Returns:
             float
         '''
-        Debug.pl(2, 'Matching with ' + str(self.strategy))
         return self.strategy.match(self.words, utterance)
 
     def __repr__(self):
@@ -1356,22 +1355,23 @@ class Parser:
         # Score sentences.
         for s in self.sentences:
             s.score_match(utterance)
-        Numbers.boost(self.sentences)
+        # Numbers.boost(self.sentences)  # boost? or
+        Numbers.normalize(self.sentences, 'score')  # norm?
+        self.sentences = sorted(self.sentences, key=lambda x: -x.score)
 
         # Apply L.
         Command.apply_l_precheck(self.commands, self.sentences)
         for c in self.commands:
             c.apply_l(self.sentences)
-        Numbers.boost(self.commands, 'lang_score')  # boost? or
-        # Numbers.normalize(self.commands, 'lang_score', 0.0)  # norm?
+        # Numbers.boost(self.commands, 'lang_score')  # boost? or
+        Numbers.normalize(self.commands, 'lang_score')  # norm?
 
         # Get combined probability.
         for c in self.commands:
             c.get_final_p()
-        # Numbers.normalize(self.commands, 'final_p', 0.0)  # norm?
+        Numbers.normalize(self.commands, 'final_p')  # norm?
 
         # Display sentences.
-        self.sentences = sorted(self.sentences, key=lambda x: -x.score)
         Info.p('Top %d sentences:' % (Parser.display_limit))
         for idx, s in enumerate(self.sentences):
             if idx < Parser.display_limit:
@@ -1516,7 +1516,7 @@ def play(parser):
         'type': 'cup',
     }
     objs = [
-        # WorldObject(o_full_reachable),
+        WorldObject(o_full_reachable),
         WorldObject(o_full_reachable_second),
     ]
 

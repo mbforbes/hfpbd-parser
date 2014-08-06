@@ -645,7 +645,6 @@ class FullMultiObjectsSimple(unittest.TestCase):
         self.parser.set_world(world_objects=objs)
 
     def test_select_obj0(self):
-        print 'testing selecting obj0'
         hands = ['right_hand', 'left_hand']
         descs = ['red box', 'red thing', 'red object', 'box', 'crimson box']
         for hand in hands:
@@ -653,7 +652,6 @@ class FullMultiObjectsSimple(unittest.TestCase):
                 self._check_object(hand, 'obj0', desc)
 
     def test_select_obj1(self):
-        print 'testing selecting obj1'
         hands = ['right_hand', 'left_hand']
         descs = ['blue cup', 'blue thing', 'blue object', 'cup']
         for hand in hands:

@@ -19,7 +19,7 @@ DEBUG_PRINTING_DEFAULT = True
 
 # Numbers
 FLOAT_COMPARE_EPSILON = 0.001
-MIN_SCORE = 1.0  # Minimum score for normalizing. Only adds to match.
+MIN_SCORE = 0.0  # Minimum score for boosting. Only adds to match.
 
 
 # ######################################################################
@@ -153,6 +153,10 @@ class Numbers:
 
         # Next, do the normalization.
         sum_ = sum(nums)
+        # Avoid divide by zero.
+        if sum_ == 0.0:
+            return [0.0] * len(nums)
+        # Else actually normalize.
         return [(n / sum_) * scale for n in nums]
 
     @staticmethod
@@ -175,7 +179,7 @@ class Numbers:
             setattr(objs[i], attr, nums[i])
 
     @staticmethod
-    def normalize(objs, attr='score', min_score=MIN_SCORE):
+    def normalize(objs, attr='score', min_score=MIN_SCORE, scale=1.0):
         '''
         Normalizes list of objects with a attr attribute (that is a
         float) to a valid probability distribution.
@@ -187,9 +191,11 @@ class Numbers:
             min_score (float, optional): The lowest score to boost
                 objects to (all objects are boosted uniformly). Defaults
                 to MIN_SCORE.
+            scale (float, optional): What nums will sum to. Defaults to
+                1.0.
         '''
         nums = [getattr(obj, attr) for obj in objs]
-        nums = Numbers.normalize_list(nums, min_score)
+        nums = Numbers.normalize_list(nums, min_score, scale)
         for i in range(len(objs)):
             setattr(objs[i], attr, nums[i])
 

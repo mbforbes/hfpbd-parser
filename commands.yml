@@ -212,9 +212,13 @@ options:
         phrases:
             - box
             - cube
+            # - thing
+            # - object
     cup:
         phrases:
             - cup
+            # - thing
+            # - object
     unknown:
         phrases:
             - thing

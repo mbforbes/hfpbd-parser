@@ -47,13 +47,11 @@ class MatchingStrategy:
             words (str)
             utterance (str)
         '''
-        ret = True
         pieces = utterance.split(' ')
         for word in words.split(' '):
             if word not in pieces:
-                ret = False
-        Debug.pl(3, 'found ' + str(words) + '? ' + str(ret))
-        return ret
+                return False
+        return True
 
 
 class DefaultMatcher:
