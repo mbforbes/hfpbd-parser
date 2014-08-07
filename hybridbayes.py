@@ -1170,7 +1170,7 @@ class Robot:
         self.properties = properties
 
     @staticmethod
-    def from_ros(self, robot_state):
+    def from_ros(robot_state):
         '''
         Args:
             robot_state (RobotState): From ROS.
