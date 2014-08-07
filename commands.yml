@@ -65,6 +65,8 @@ parameters:
         - down
         - to_left
         - to_right
+        - forward
+        - backward
     side:
         - right_hand
         - left_hand
@@ -168,12 +170,17 @@ options:
         phrases:
             - to-the-left
             - left
-        # strategy: notside
     to_right:
         phrases:
             - to-the-right
             - right
-        # strategy: notside
+    forward:
+        phrases:
+            - forward
+            - away
+    backward:
+        phrases:
+            - backwards
     right_hand:
         phrases:
             - right-hand

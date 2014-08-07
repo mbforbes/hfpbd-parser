@@ -12,22 +12,25 @@ Here's the process:
 
     - Use the CommandTemplates to generate all Commands
 
-    - Apply the world (W) and robot (R) states into the Commands to get
-        a prior over which are most likely (P(C|W,R)). (Command.score)
+    - Apply the world (w) and robot (r) states into the Commands to get
+        probabilities for which commands are most likely (P(C|w,r)).
+        (Command.score).
 
-    - Use all Commands to generate all Sentences
+    - Use all Commands to generate all Sentences (L).
 
     - Pre-match-score all Commands with Sentences based on Phrase
-        matches (P(C|L)).
+        matches (P(C|l)).
 
     - When an utterance comes in, score all Sentences based on Phrase
-        matching strategies (subclass of MatchingStrategy) (P(L))
+        matching strategies (subclass of MatchingStrategy) (estimate
+        P(u|L); u space is infinite so we can't compute exactly).
 
     - Combine Command-Sentences scores with the Sentence-utterance
-        scores to find the language score. (Command.lang_score)
+        scores to find the language score. (Command.lang_score) (i.e.
+        use P(u|L) and marginalize L across P(L|C) to get P(C|u)).
 
-    - Combine the W, R-induced probability P(C|W,R) with the language
-        score P(L|W,R,C) to get the final probability P(C|W,R,C,L)
+    - Combine the w, r-induced probability P(C|w,r) with the language
+        score P(C|u) to get the final probability P(C|u,w,r).
         (Command.final_p).
 '''
 
@@ -80,6 +83,8 @@ M_RP = {
     'down': 'can_move_down',
     'to_left': 'can_move_toleft',
     'to_right': 'can_move_toright',
+    'forward': 'can_move_forward',
+    'backward': 'can_move_backward',
 }
 
 # Map (M) from object properties to WordOption names (WO)
@@ -1193,6 +1198,12 @@ class Robot:
 
         if len(robot_state.can_move_toright) == 2:
             props['can_move_toright'] = robot_state.can_move_toright
+
+        if len(robot_state.can_move_forward) == 2:
+            props['can_move_forward'] = robot_state.can_move_forward
+
+        if len(robot_state.can_move_backward) == 2:
+            props['can_move_backward'] = robot_state.can_move_backward
 
         return Robot(props)
 
