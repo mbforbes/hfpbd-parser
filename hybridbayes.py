@@ -106,11 +106,6 @@ P_NOTLASTSIDE = -0.1  # Penalty: the side wasn't the last commanded.
 P_GSTATE = -8.0  # Penalty: nonsensical gripper state change requested.
 P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 
-# Language score
-
-# Combined Score
-LANG_WEIGHT = 2.0  # How much to weight rel. to cmd (cmd wegiht = 1.0)
-
 
 ########################################################################
 # Classes
@@ -722,8 +717,7 @@ class Command:
 
         The result is stored in self.final_p.
         '''
-        # self.final_p = self.score * self.lang_score  # original
-        self.final_p = self.score + self.lang_score * LANG_WEIGHT  # new
+        self.final_p = self.score * self.lang_score
 
 
 class Parameter:
@@ -937,15 +931,14 @@ class Sentence:
             #     2,
             #     "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
 
-        # Option 1: Weight the scores by the max (i.e. the length).
+        # Clamp scores so they're between 0 and 1 (i.e. a probability).
         max_score = (
             MatchingStrategy.verb_match +
             (len(self.phrases) - 1) * MatchingStrategy.param_match)
         self.score = (total_score / max_score)**LENGTH_EXP
+        # Debug
+        # assert self.score >= 0.0 and self.score <= 1.0
         # Debug.pl(2, "Final score: " + str(self))
-
-        # Option 2: Just use the raw score?
-        # self.score = total_score
 
 
 class Phrase:
@@ -1522,7 +1515,7 @@ class Parser:
         for s in self.sentences:
             s.score_match(utterance)
         # Numbers.boost(self.sentences)  # boost? or
-        Numbers.normalize(self.sentences, 'score')  # norm?
+        # Numbers.normalize(self.sentences, 'score')  # norm?
         self.sentences = sorted(self.sentences, key=lambda x: -x.score)
 
         # Apply L.
