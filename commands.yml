@@ -248,7 +248,6 @@ options:
     cup:
         phrases:
             - cup
-            - glass
             - thing
             - object
     unknown:
