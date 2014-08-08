@@ -159,7 +159,7 @@ O_FULL_REACHABLE = {
     'is_nextto_reachable': [True, True],
     # Relation to other objects. These should be more general.
     'is_leftmost': False,
-    'is_righttmost': False,
+    'is_rightmost': False,
     'is_biggest': False,
     'is_smallest': False,
     # E.g. red, blue, green, unknown
@@ -176,7 +176,7 @@ O_RIGHT_POSSIBLE = {
     'is_above_reachable': [True, False],
     'is_nextto_reachable': [True, False],
     'is_leftmost': False,
-    'is_righttmost': True,
+    'is_rightmost': True,
     'is_biggest': False,
     'is_smallest': True,
     # E.g. red, blue, green, unknown
@@ -204,7 +204,7 @@ O_LEFT_POSSIBLE_SECOND = {
     'is_above_reachable': [False, True],
     'is_nextto_reachable': [False, True],
     'is_leftmost': True,
-    'is_righttmost': False,
+    'is_rightmost': False,
     'is_biggest': True,
     'is_smallest': False,
     # E.g. red, blue, green, unknown
@@ -222,7 +222,7 @@ O_FULL_REACHABLE_SECOND = {
     'is_nextto_reachable': [True, True],
     # Relation to other objects. These should be more general.
     'is_leftmost': False,
-    'is_righttmost': False,
+    'is_rightmost': False,
     'is_biggest': False,
     'is_smallest': False,
     # E.g. red, blue, green, unknown
@@ -239,7 +239,7 @@ O_IMPOSSIBLE = {
     'is_nextto_reachable': [False, False],
     # Relation to other objects. These should be more general.
     'is_leftmost': False,
-    'is_righttmost': False,
+    'is_rightmost': False,
     'is_biggest': False,
     'is_smallest': False,
     # E.g. red, blue, green, unknown
@@ -429,7 +429,7 @@ class FullOneObjNoRobot(unittest.TestCase):
             self.parser.parse('move left-arm higher')[0],
             RC_MOVEABS['LH_UP'])
         self.assertEqual(
-            self.parser.parse('move right-gripper to the left')[0],
+            self.parser.parse('move right-gripper to-the-left')[0],
             RC_MOVEABS['RH_LEFT'])
         self.assertEqual(
             self.parser.parse('pick the red block up left-hand')[0],

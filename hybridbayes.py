@@ -99,6 +99,7 @@ M_WO = {
     'is_biggest': 'biggest',
     'is_smallest': 'smallest',
 }
+M_WO_INVERSE = {v: k for k, v in M_WO.iteritems()}
 
 # Command score
 START_SCORE = 1.0  # To begin with. Maybe doesn't matter.
@@ -135,6 +136,12 @@ class CommandDict(object):
         CommandDict.longest_cmd_name_len = max(
             [len(cmd) for cmd, params in self.ydict['commands'].iteritems()])
 
+        # Make all adjectives in object option descriptors optional.
+        for desc_type, props in ydict['descriptors'].iteritems():
+            if 'adjective' in props and props['adjective']:
+                for option in props['options']:
+                    ydict['options'][option]['optional'] = True
+
     def get_grammar(self, wobjs):
         '''
         Args:
@@ -142,16 +149,18 @@ class CommandDict(object):
                 from a YAML file).
 
         Returns:
-            2-tuple of: (
-                [CommandTemplate],
+            3-tuple of: (
                 [Phrase]
+                [Option]
+                [CommandTemplate],
+
             )
         '''
         phrase_map = self._make_phrases()
         options = self._make_options(phrase_map, wobjs)
         parameters = self._make_parameters(options)
         templates = self._make_templates(parameters)
-        return (phrase_map.values(), templates)
+        return (phrase_map.values(), options.values(), templates)
 
     def _make_templates(self, parameters):
         '''
@@ -242,7 +251,7 @@ class CommandDict(object):
                 phrase_map[(words, matcher)] for words in props['phrases']]
 
             # Make our word option and add it.
-            w_opt = WordOption(opt_name, phrases)
+            w_opt = WordOption(opt_name, phrases, props)
             options[opt_name] = w_opt
 
         # Now make object options, because they are described by word
@@ -711,13 +720,30 @@ class Option(object):
         '''
         return self.name
 
+    def is_optional(self):
+        '''
+        ObjectOptions are not optional (though WordOptions they contain
+        may be).
+
+        Returns:
+            bool
+        '''
+        return self.opt
+
 
 class WordOption(Option):
     '''Holds options info, including all possible referring phrases.'''
 
-    def __init__(self, name, phrases):
+    def __init__(self, name, phrases, props):
+        '''
+        Args:
+            name (str)
+            phrases ([Phrases])
+            props ({})
+        '''
         self.name = name
         self.phrases = phrases
+        self.opt = 'optional' in props and props['optional']
 
     def get_phrases(self):
         '''
@@ -749,6 +775,8 @@ class ObjectOption(Option):
         self.world_obj = world_obj
         self.word_options = self._get_word_options(options)
         self.phrases = []  # Compute later and cache.
+        self.phrases_skipping = []  # Compute later and cache.
+        self.opt = False
 
     def _get_word_options(self, options):
         '''
@@ -777,8 +805,10 @@ class ObjectOption(Option):
         # - color (red, green, blue)
         # - type (box, cup, unknown)
         #
-        # First, we do the unique properties (left-most, biggest, etc.)
-        word_options = []
+        # First, we add the essential starter ('the').
+        word_options = [options['the']]
+
+        # Next, we do the unique properties (left-most, biggest, etc.)
         for object_property, word_option_name in M_WO.iteritems():
             # NOTE: The properties are currently bools, so
             # get_property(...) is enough.
@@ -811,7 +841,7 @@ class ObjectOption(Option):
         '''
         return self.world_obj
 
-    def get_phrases(self):
+    def get_phrases(self, skipping=False):
         '''
         Returns a list of possible phrases, where each element is a list
         of Phrases.
@@ -819,9 +849,15 @@ class ObjectOption(Option):
         Returns:
             [[Phrase]]
         '''
-        if len(self.phrases) == 0:
-            self.phrases = Algo.gen_phrases(self.word_options)
-        return self.phrases
+        if skipping:
+            if len(self.phrases_skipping) == 0:
+                self.phrases_skipping = Algo.gen_phrases(
+                    self.word_options, True)
+            return self.phrases_skipping
+        else:
+            if len(self.phrases) == 0:
+                self.phrases = Algo.gen_phrases(self.word_options, False)
+            return self.phrases
 
 
 class Sentence(object):
@@ -1305,6 +1341,7 @@ class Parser(object):
         self.world_objects_for_generation = None
         self.robot = None
         self.phrases = None
+        self.options = None
         self.templates = None
         self.commands = None
 
@@ -1341,17 +1378,66 @@ class Parser(object):
 
     def print_sentences(self):
         '''Prints all sentences to stdout, one per line.'''
-        # Provide initial world, robot
         Debug.printing = False
         Info.printing = False
+
         # NOTE(mbforbes): Because sentences can only be generated after
         # we know about the objects that we have in the world, if we
         # want to truly exhaustively generate all possible sentences
         # here then we must exhaustively generate all possible objects
-        # first. Should there be a helper function that does that?
-        self.set_default_world()
+        # first. HOWEVER, with word skipping for objects (you don't
+        # always want to have to say all descriptors for an object), the
+        # space of possible sentences explodes (into the millions). So
+        # we seprately generate all sentences without objects, then
+        # separately generate object phrases.
+        self.set_world()
         for sentence in self.sentences:
             print sentence.get_raw()
+
+        # Debug
+        wobjs = [WorldObject(o) for o in self._gen_objs()]
+
+        # Look for object options
+        sentence_set = set()
+        self.set_world(world_objects=wobjs)
+        for opt in self.options:
+            if type(opt) == ObjectOption:
+                phrase_lists = opt.get_phrases(True)
+                for phrase_list in phrase_lists:
+                    sentence_set.add(' '.join([str(p) for p in phrase_list]))
+        for sentence in sentence_set:
+            print sentence
+
+        # Backup as sentence generation with objects and word skipping
+        # explodes.
+        for phrase in self.phrases:
+            print phrase
+
+    def _gen_objs(self):
+        '''For sentence generation (for speech recognition training
+        data), must get exhaustive list of objs.
+        '''
+        all_opts = []
+        for k, prop in yaml.load(
+                open(COMMAND_GRAMMAR))['descriptors'].iteritems():
+            opts = [(k, o) for o in prop['options']]
+            all_opts += [opts]
+
+        all_combs = Algo.gen_recursive(all_opts)
+
+        objs = []
+        for idx, comb in enumerate(all_combs):
+            obj = {'name': 'obj' + str(idx)}
+            # Put in this combination of exclusive properties
+            for name, val in comb:
+                if val in M_WO_INVERSE:
+                    # We need to map to some world object key.
+                    obj[M_WO_INVERSE[val]] = val
+                else:
+                    # The key from the grammar was the one we use.
+                    obj[name] = val
+            objs += [obj]
+        return objs
 
     def startup_ros(self):
         '''ROS-specific: Sets up callbacks for
@@ -1503,11 +1589,26 @@ class Parser(object):
         # Get top command (calculated by Command.cmp).
         self.commands.sort(cmp=Command.cmp)
 
+        # If top two are indistinguishablly close, ask to clarify.
+        first, second = self.commands[0], self.commands[1]
+        if (Numbers.are_floats_close(first.lang_score, second.lang_score) and
+                Numbers.are_floats_close(first.score, second.score)):
+            clarify_args = []
+            # If same template, find non-shared properties to clarify.
+            if first.template == second.template:
+                for k, v in first.option_map.iteritems():
+                    if second.option_map[k] != v:
+                        clarify_args += [k]
+            rc = RobotCommand.from_strs('clarify', clarify_args)
+        else:
+            # Otherwise, we got a solid top result.
+            rc = RobotCommand.from_command(first)
+
         # We return a new representation of the command as well as some
         # logging buffers (perhaps) for display.
         self._log_results()
         ret = (
-            RobotCommand.from_command(self.commands[0]),
+            rc,
             '\n'.join([self.start_buffer, self.get_print_buffer()])
         )
 
@@ -1551,11 +1652,11 @@ class Parser(object):
             - self.world_objects ([WorldObject])
             - self.robot (Robot)
         '''
-        self._update_world_internal_generate()
+        self._update_world_internal_maybe_generate()
         self._update_world_internal_score()
         self.start_buffer = self.get_print_buffer()
 
-    def _update_world_internal_generate(self):
+    def _update_world_internal_maybe_generate(self):
         '''
         This part generates all templates (phrases, options, commands,
         sentences) and takes a long time. It doesn't apply the world
@@ -1576,8 +1677,8 @@ class Parser(object):
 
         # Make templates (this extracts options and params).
         self.world_objects_for_generation = self.world_objects
-        self.phrases, self.templates = self.command_dict.get_grammar(
-            self.world_objects)
+        self.phrases, self.options, self.templates = (
+            self.command_dict.get_grammar(self.world_objects))
         Debug.p('Templates:')
         for t in self.templates:
             Debug.pl(1, t)
@@ -1705,7 +1806,7 @@ def play(parser):
         'is_above_reachable': [True, False],
         'is_nextto_reachable': [True, False],
         'is_leftmost': False,
-        'is_righttmost': True,
+        'is_rightmost': True,
         'is_biggest': False,
         'is_smallest': True,
         # E.g. red, blue, green, unknown
@@ -1720,7 +1821,7 @@ def play(parser):
         'is_above_reachable': [False, True],
         'is_nextto_reachable': [False, True],
         'is_leftmost': True,
-        'is_righttmost': False,
+        'is_rightmost': False,
         'is_biggest': True,
         'is_smallest': False,
         # E.g. red, blue, green, unknown

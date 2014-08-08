@@ -75,24 +75,35 @@ parameters:
         - previous
 # Ways we can talk about objects. These serve as filters to select the
 # options below (they aren't loaded like parameters). Otherwise, these
-# are similar to parameters in that they map to options.
+# are similar to parameters in that they map to options. "Exclusive"
+# means you can pick only one.
 descriptors:
-    location:
-        - left_most
-        - right_most
-        - farthest
-        - nearest
+    lr:
+        options:
+            - left_most
+            - right_most
+        adjective: true
+    far:
+        options:
+            - farthest
+            - nearest
+        adjective: true
     size:
-        - biggest
-        - smallest
+        options:
+            - biggest
+            - smallest
+        adjective: true
     color:
-        - red
-        - green
-        - blue
+        options:
+            - red
+            - green
+            - blue
+        adjective: true
     type:
-        - box
-        - cup
-        - unknown
+        options:
+            - box
+            - cup
+            - unknown
 # options -> phrases
 # These are the spoken utterance options for all commands and options.
 options:
@@ -205,17 +216,19 @@ options:
             - skill
             - program
 # Ways we can talk about objects (these are still options).
+# This always goes before objects. Somewhat of a special case.
+    the:
+        phrases:
+            - the
 # Location
     left_most:
         phrases:
             - left-most
             - left
-        # strategy: notside
     right_most:
         phrases:
             - right-most
             - right
-        # strategy: notside
     farthest:
         phrases:
             - farthest
@@ -261,3 +274,11 @@ options:
         phrases:
             - thing
             - object
+# These phrases are commonly used in speech, but we don't explicitly
+# model in our commands.
+    your:
+        phrases:
+            - your
+    with:
+        phrases:
+            - with

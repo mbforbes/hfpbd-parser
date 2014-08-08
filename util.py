@@ -7,6 +7,8 @@ __author__ = 'mbforbes'
 # Imports
 # ######################################################################
 
+import sys
+
 
 # ######################################################################
 # Constants
@@ -230,7 +232,34 @@ class Algo:
     '''
 
     @staticmethod
-    def gen_phrases(options):
+    def gen_recursive(list_of_lists, results=[]):
+        '''
+        Return all listsings where each element is one element from each
+        element in list_of_lists. How's that for a confusing
+        description?
+
+        Destructively mutates list_of_lists (though not the elements).
+
+        Args:
+            list_of_lists ([[object]])
+
+        Return:
+            [[object]]
+        '''
+        if len(list_of_lists) == 0:
+            return results
+        next_options = list_of_lists.pop(0)
+        if len(results) == 0:
+            new_results = [[o] for o in next_options]
+        else:
+            new_results = []
+            for o in next_options:
+                for r in results:
+                    new_results += [r + [o]]
+        return Algo.gen_recursive(list_of_lists, new_results)
+
+    @staticmethod
+    def gen_phrases(options, skipping=False):
         '''
         Generates an exhaustive list of lists of phrases from the passed
         list of Options.
@@ -244,10 +273,10 @@ class Algo:
         # The recursive method removes from the list, so we copy
         # references (shallow) first.
         opt_copy = options[:]
-        return Algo._gen_phrases_recursive(opt_copy)
+        return Algo._gen_phrases_recursive(opt_copy, [], skipping)
 
     @staticmethod
-    def _gen_phrases_recursive(todo, results=[]):
+    def _gen_phrases_recursive(todo, results=[], skipping=False):
         '''
         Recursively generates an exhaustive list of lists of phrases
         from the passed options in todo.
@@ -274,4 +303,12 @@ class Algo:
             for phrase_list in next_phrases:
                 for r in results:
                     new_results += [r + phrase_list]
-        return Algo._gen_phrases_recursive(todo, new_results)
+
+        # If skipping is enabled and the option was optional, generate
+        # results without it as well.
+        wo_results = []
+        if skipping and opt.is_optional():
+            wo_results = Algo._gen_phrases_recursive(todo[:], results[:], True)
+        return (
+            Algo._gen_phrases_recursive(todo, new_results, skipping) +
+            wo_results)
