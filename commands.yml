@@ -142,7 +142,7 @@ options:
         strategy: verb
     create_new_action:
         phrases:
-            - create_new_action
+            - create-new-action
         strategy: verb
     switch_to:
         phrases:

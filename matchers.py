@@ -34,11 +34,28 @@ class MatchingStrategy:
 
     @staticmethod
     def match(words, utterance):
-        Error.p("MatchingStrategy:match unimplemented as it's an interface.")
+        '''Returns whether words match an utterance.
+
+        Args:
+            words (str)
+            utterance (str)
+
+        Returns:
+            bool
+        '''
+        return MatchingStrategy._words_in(words, utterance)
+
+    @staticmethod
+    def score():
+        '''
+        Returns score that should be given for matching the phrase
+        correctly.
+        '''
+        Error.p("MatchingStrategy:score unimplemented as it's an interface.")
         sys.exit(1)
 
     @staticmethod
-    def words_in(words, utterance):
+    def _words_in(words, utterance):
         '''
         Returns whether all words in words are found somewhere in
         utterance.
@@ -54,47 +71,20 @@ class MatchingStrategy:
         return True
 
 
-class DefaultMatcher:
-    '''Default matching strategy.'''
+class DefaultMatcher(MatchingStrategy):
+    '''Default matching strategy (for 'normal' parameters).'''
 
     @staticmethod
-    def match(words, utterance):
-        '''Returns whether words match an utterance.
-
-        Args:
-            words (str)
-            utterance (str)
-
-        Returns:
-            float: score
-        '''
-        return (
-            MatchingStrategy.param_match
-            if MatchingStrategy.words_in(words, utterance)
-            else 0.0
-        )
+    def score():
+        return MatchingStrategy.param_match
 
 
-class VerbMatcher:
-    '''Default matching strategy.'''
+class VerbMatcher(MatchingStrategy):
+    '''Matching strategy for verbs.'''
 
     @staticmethod
-    def match(words, utterance):
-        '''Returns whether words match an utterance. words contains
-        verbs.
-
-        Args:
-            words (str)
-            utterance (str)
-
-        Returns:
-            float: score
-        '''
-        return (
-            MatchingStrategy.verb_match
-            if MatchingStrategy.words_in(words, utterance)
-            else 0.0
-        )
+    def score():
+        return MatchingStrategy.verb_match
 
 
 class Matchers:

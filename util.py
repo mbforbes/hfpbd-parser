@@ -19,7 +19,7 @@ DEBUG_PRINTING_DEFAULT = True
 
 # Numbers
 FLOAT_COMPARE_EPSILON = 0.001
-
+LENGTH_EXP = 10.0  # Polynomial degree for weight by length (x^this).
 
 # ######################################################################
 # Classes
@@ -178,6 +178,28 @@ class Numbers:
             setattr(objs[i], attr, nums[i])
 
     @staticmethod
+    def make_prob(objs, attr='score'):
+        '''
+        Makes a list of objects with an attr attribute (that is a float)
+        so they are all 0.0 < val < 1.0 by using the maximum as the 1.0
+        value and doing exponential decay to 0.0.
+
+        Args:
+            objs ([Object]): List of Objects
+            attr (str, optional): The name of the attribute to extract
+                from objects. Defaults to 'score'.
+        '''
+        max_ = max([getattr(obj, attr) for obj in objs])
+        if max_ == 0.0:
+            for obj in objs:
+                setattr(obj, attr, 1.0 / len(objs))
+        else:
+            for obj in objs:
+                orig = getattr(obj, attr)
+                new = (orig / max_)**LENGTH_EXP
+                setattr(obj, attr, new)
+
+    @staticmethod
     def normalize(objs, attr='score', min_score=0.0, scale=1.0):
         '''
         Normalizes list of objects with a attr attribute (that is a
@@ -198,6 +220,14 @@ class Numbers:
         for i in range(len(objs)):
             setattr(objs[i], attr, nums[i])
 
+
+class Algo:
+    '''
+    Misc algorithms that occur multiple times.
+
+    On second thought, maybe these functions should be in Option. Hmm.
+    '''
+
     @staticmethod
     def gen_phrases(options):
         '''
@@ -213,7 +243,7 @@ class Numbers:
         # The recursive method removes from the list, so we copy
         # references (shallow) first.
         opt_copy = options[:]
-        return Numbers._gen_phrases_recursive(opt_copy)
+        return Algo._gen_phrases_recursive(opt_copy)
 
     @staticmethod
     def _gen_phrases_recursive(todo, results=[]):
@@ -243,4 +273,4 @@ class Numbers:
             for phrase_list in next_phrases:
                 for r in results:
                     new_results += [r + phrase_list]
-        return Numbers._gen_phrases_recursive(todo, new_results)
+        return Algo._gen_phrases_recursive(todo, new_results)

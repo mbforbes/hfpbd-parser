@@ -43,15 +43,16 @@ __author__ = 'mbforbes'
 
 # Builtins
 import code
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import copy
+from operator import attrgetter
 import pprint
 import sys
 import threading
 import yaml
 
 # Local
-from util import Logger, Error, Info, Debug, Numbers
+from util import Logger, Error, Info, Debug, Numbers, Algo
 from matchers import DefaultMatcher, MatchingStrategy, Matchers
 
 
@@ -100,6 +101,7 @@ M_WO = {
 }
 
 # General scoring
+# TODO(mbforbes): Remove once tests are passing!!!
 LENGTH_EXP = 10.0  # Polynomial degree for weight by length (x^this).
 
 # Command score
@@ -109,14 +111,20 @@ P_LOCUNR = -5.0  # Penalty: the requested location is unreachable.
 P_OBJUNR = -5.0  # Penalty: the requested object cannot be picked up.
 P_NOTLASTSIDE = -0.1  # Penalty: the side wasn't the last commanded.
 P_GSTATE = -8.0  # Penalty: nonsensical gripper state change requested.
+P_DUMBSTOP = -10.0  # Penalty: can't stop when not executing.
+P_DUMBEXEC = -10.0  # Penalty: can't execute when already doing so.
 P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 
+# How close language scores have to be before we start to use the
+# command score (world and robot-influenced) to break ties. This really
+# needs to be tuned as the number of comamnds (sentences) grows.
+LANGUAGE_TIE_EPSILON = 0.001
 
 ########################################################################
 # Classes
 ########################################################################
 
-class CommandDict:
+class CommandDict(object):
     '''The Python representation of our YAML-defined commands file.'''
 
     longest_cmd_name_len = 0
@@ -130,17 +138,33 @@ class CommandDict:
         CommandDict.longest_cmd_name_len = max(
             [len(cmd) for cmd, params in self.ydict['commands'].iteritems()])
 
-    def make_templates(self, wobjs):
+    def get_grammar(self, wobjs):
         '''
         Args:
             wobjs ([WorldObject]): The object we see in the world (or
                 from a YAML file).
 
         Returns:
+            2-tuple of: (
+                [CommandTemplate],
+                [Phrase]
+            )
+        '''
+        phrase_map = self._make_phrases()
+        options = self._make_options(phrase_map, wobjs)
+        parameters = self._make_parameters(options)
+        templates = self._make_templates(parameters)
+        return (phrase_map.values(), templates)
+
+    def _make_templates(self, parameters):
+        '''
+        Args:
+            parameters ([{str: Parameter}])
+
+        Returns:
             [CommandTemplate]
         '''
-        options = self._make_options(wobjs)
-        parameters = self._make_parameters(options)
+
         templates = []
         for cmd, pnames in self.ydict['commands'].iteritems():
             params = []
@@ -197,29 +221,28 @@ class CommandDict:
         Debug.p('Params: ' + str(params.values()))
         return params
 
-    def _make_options(self, wobjs):
+    def _make_options(self, phrase_map, wobjs):
         '''
         Args:
+            phrase_map ({(str, class): Phrase}): Map of
+                {('words', strategy): Phrase}.
             wobjs ([WorldObject]): The object wes see in the world (or
                 from a YAML file or python dict).
 
         Returns:
-            {str: Option}: Map of option name: Option.
+            {str: Option}: Map of {'option name': Option}.
         '''
         options = {}
         # Make word options from phrases.
-        matcher = DefaultMatcher
         for opt_name, props in self.ydict['options'].iteritems():
-            # Get strategy, if special
+            # Get strategy, if special.
+            matcher = Matchers.MATCHERS['default']
             if 'strategy' in props:
-                matcher_name = props['strategy']
-                matcher = Matchers.MATCHERS[matcher_name]
-            else:
-                matcher = Matchers.MATCHERS['default']
+                matcher = Matchers.MATCHERS[props['strategy']]
 
             # Get phrases
-            raw_phrases = props['phrases']
-            phrases = [Phrase(phrase, matcher) for phrase in raw_phrases]
+            phrases = [
+                phrase_map[(words, matcher)] for words in props['phrases']]
 
             # Make our word option and add it.
             w_opt = WordOption(opt_name, phrases)
@@ -233,8 +256,32 @@ class CommandDict:
         Debug.p('Options: ' + str(options.values()))
         return options
 
+    def _make_phrases(self):
+        '''
+        Returns:
+            {str: Phrase}: Map of {'words': Phrase}.
+        '''
+        phrases = {}
+        # Make phrases
+        for opt_name, props in self.ydict['options'].iteritems():
+            # Get strategy, if special.
+            matcher = Matchers.MATCHERS['default']
+            if 'strategy' in props:
+                matcher = Matchers.MATCHERS[props['strategy']]
 
-class CommandTemplate:
+            # Get phrases
+            for words in props['phrases']:
+                key = (words, matcher)
+                # Avoid making duplicates and pushing the other ones
+                # out just for convenience.
+                if key not in phrases:
+                    phrases[key] = Phrase(words, matcher)
+
+        Debug.p('Phrases: ' + str(phrases.values()))
+        return phrases
+
+
+class CommandTemplate(object):
     '''An uninstantiated command.'''
 
     def __init__(self, name, params):
@@ -311,7 +358,7 @@ class CommandTemplate:
         return CommandTemplate._gen_opts(todo, new_results)
 
 
-class Command:
+class Command(object):
     '''A fully-instantiated command.
 
     Has state: YES
@@ -330,12 +377,14 @@ class Command:
         self.name = name
         self.option_map = option_map
         self.template = template
+        self.phrase_sets = []  # Caching
+        self.sentences = []  # Caching
 
         # P(C|W,R)
         self.score = START_SCORE
 
         # P(L|C)
-        self.sentence_match_probs = {}
+        self.sentence_match_probs = defaultdict(float)
 
         # P(L|C) * P(L) (marginalize across L)
         self.lang_score = 0.0
@@ -423,11 +472,14 @@ class Command:
         if not Command.debug:
             return
 
+        # NOTE(mbforbes); This kind of thing may be useful once
+        # everything is finalized. But even then maybe not.
+
         # Ensure command scores are normalized.
-        sum_ = sum(c.score for c in commands)
-        if not Numbers.are_floats_close(sum_, 1.0):
-            Error.p('Command scores are not normed: %0.3f' % (sum_))
-            sys.exit(1)
+        # sum_ = sum(c.score for c in commands)
+        # if not Numbers.are_floats_close(sum_, 1.0):
+        #     Error.p('Command scores are not normed: %0.3f' % (sum_))
+        #     sys.exit(1)
 
         # Ensure sentence scores normalized.
         # sum_ = sum(s.score for s in sentences)
@@ -436,19 +488,19 @@ class Command:
         #     sys.exit(1)
 
         # Check a few things for all commands.
-        for c in commands:
-            # Quick check whether sentence_match_probs reasonable.
-            if len(c.sentence_match_probs) != len(sentences):
-                Error.p('Must score_match_sentences before apply_l.')
-                sys.exit(1)
+        # for c in commands:
+        #     # Quick check whether sentence_match_probs reasonable.
+        #     if len(c.sentence_match_probs) != len(sentences):
+        #         Error.p('Must score_match_sentences before apply_l.')
+        #         sys.exit(1)
 
-            # Ensure all sentences pre-matched with this command.
-            for s in sentences:
-                if s not in c.sentence_match_probs.keys():
-                    Error.p(
-                        ('Command %s sentence_match_probs missing ' +
-                            'sentence: %s') % (str(c), str(s)))
-                    sys.exit(1)
+        #     # Ensure all sentences pre-matched with this command.
+        #     for s in sentences:
+        #         if s not in c.sentence_match_probs.keys():
+        #             Error.p(
+        #                 ('Command %s sentence_match_probs missing ' +
+        #                     'sentence: %s') % (str(c), str(s)))
+        #             sys.exit(1)
 
             # # Ensure sentence match scores normalized.
             # sum_ = sum(
@@ -464,8 +516,11 @@ class Command:
         Returns:
             [Sentence]
         '''
-        phrase_lists = Numbers.gen_phrases(self.option_map.values())
-        return [Sentence(pl) for pl in phrase_lists]
+        # Cache.
+        if len(self.sentences) == 0:
+            phrase_lists = Algo.gen_phrases(self.option_map.values())
+            self.sentences = [Sentence(pl) for pl in phrase_lists]
+        return self.sentences
 
     def has_obj_opt(self):
         '''
@@ -488,14 +543,18 @@ class Command:
         Returns:
             [[Phrase]]: The length is the number of options this command
                 has, and each element is a list that contains all of
-                that options' commands.
+                that options' phrases.
         '''
-        phrase_sets = []
-        for pname, opt in self.option_map.iteritems():
-            opt_phrase_sets = opt.get_phrases()
-            for phrase in opt_phrase_sets:
-                phrase_sets += [phrase]
-        return phrase_sets
+        # We cache and only compute if it's never been computed. This
+        # only happens once currently, but it shouldn't be done twice.
+        if len(self.phrase_sets) == 0:
+            phrase_sets = []
+            for pname, opt in self.option_map.iteritems():
+                opt_phrase_sets = opt.get_phrases()
+                for phrase in opt_phrase_sets:
+                    phrase_sets += [phrase]
+            self.phrase_sets = phrase_sets
+        return self.phrase_sets
 
     def apply_w(self):
         '''
@@ -566,7 +625,14 @@ class Command:
             commands ([Command])
             robot (Robot)
         '''
-        # All robot applications so far involve a side.
+        if robot.has_property('is_executing'):
+            is_exec = robot.get_property('is_executing')
+            if self.name == 'stop' and not is_exec:
+                self.score += P_DUMBSTOP
+            elif self.name == 'execute' and is_exec:
+                self.score += P_DUMBEXEC
+
+        # All following robot applications involve a side.
         if not self.template.has_params(['side']):
             return
 
@@ -587,13 +653,13 @@ class Command:
             if self.name == 'open':
                 if gs == 'open':
                     self.score += P_GSTATE
-            if self.name == 'close':
+            elif self.name == 'close':
                 if gs == 'closed_empty' or gs == 'has_obj':
                     self.score += P_GSTATE
-            if self.name == 'pick_up':
+            elif self.name == 'pick_up':
                 if gs == 'has_obj':
                     self.score += P_BADPP
-            if self.name == 'place':
+            elif self.name == 'place':
                 if gs == 'open' or gs == 'closed_empty':
                     self.score += P_BADPP
 
@@ -615,78 +681,9 @@ class Command:
         Args:
             sentences ([Sentence])
         '''
-        # Display settings.
-        display_limit = 8
-
-        # Debug.p('Sentence-matching command: ' + str(self))
-        # Empty list before we start adding to it.
-        if len(self.sentence_match_probs) != 0:
-            self.sentence_match_probs = {}
-
-        scores = []
-        # kvs = []  # Debug
-        phrase_sets = self.get_phrase_sets()
-        for sentence in sentences:
-            score = 0.0
-            s_phrases = sentence.get_phrases()
-
-            # We simply count the phrase matches. We want to penalize
-            # missing phrases in either direction, so we just check both
-            # ways (double-scoring matches). Also note we match on the
-            # command side per option (set of phrases).
-
-            # Check whether any phrase for each command option in
-            # sentence phrases.
-            n_opts = len(phrase_sets)
-            match_score = 0.0
-            for idx, phrase_set in enumerate(phrase_sets):
-                for phrase in phrase_set:
-                    # The following uses Phrase's __eq__ method.
-                    if phrase in s_phrases:
-                        # Verbs get a different score than params.
-                        if idx == 0:
-                            match_score += MatchingStrategy.verb_match
-                        else:
-                            match_score += MatchingStrategy.param_match
-                        break
-            max_match_score = (
-                MatchingStrategy.verb_match +
-                (n_opts - 1) * MatchingStrategy.param_match)
-            score += (match_score / max_match_score)**LENGTH_EXP
-
-            # Check each phrase in the sentence's phrases.
-            n_phrases = len(s_phrases)
-            match_score = 0.0
-            for idx, s_phrase in enumerate(s_phrases):
-                for phrase_set in phrase_sets:
-                    # The following uses Phrase's __eq__ method.
-                    if s_phrase in phrase_set:
-                        # Verbs get a different score than params.
-                        if idx == 0:
-                            match_score += MatchingStrategy.verb_match
-                        else:
-                            match_score += MatchingStrategy.param_match
-                        break
-            max_match_score = (
-                MatchingStrategy.verb_match +
-                (n_phrases - 1) * MatchingStrategy.param_match)
-            score += (match_score / max_match_score)**LENGTH_EXP
-
-            scores += [score]
-            # Debug.pl(1, '%0.10f %s' % (score, str(sentence.get_raw())))
-
-        # Normalize, save
-        norm_scores = Numbers.normalize_list(scores, 0.1, 2.0)
-        for idx, sentence in enumerate(sentences):
-            self.sentence_match_probs[sentence] = norm_scores[idx]
-            # kvs += [(norm_scores[idx], scores[idx], sentence.get_raw())]
-
-        # Debug
-        # Debug.p(
-        #     'Sentence-matching scores for command: ' + str(self.pure_str()))
-        # skvs = sorted(kvs, key=lambda x: -x[0])
-        # for kv in skvs:
-        #     Debug.pl(1, "%0.3f %0.3f %s" % (kv[0], kv[1], kv[2]))
+        s_score = 1.0 / len(self.sentences)
+        for s in self.sentences:
+            self.sentence_match_probs[s] = s_score
 
     def apply_l(self, sentences):
         '''
@@ -697,23 +694,42 @@ class Command:
         Args:
             sentences ([Sentence])
         '''
-        score_total = 0.0
-        # Debug.pl(0, 'Scoring %s' % (str(self)))
-        for s in sentences:
-            inc = s.score * self.sentence_match_probs[s]
-            score_total += inc
-            # Debug.pl(
-            #     1,
-            #     'Tot: %0.3f, adding %0.3f = %0.3f x %0.3f from %s' % (
-            #         score_total,
-            #         inc,
-            #         self.sentence_match_probs[s],
-            #         s.score,
-            #         s.get_raw()
-            #     )
-            # )
-        # Debug.pl(1, 'Total: %0.3f' % (score_total))
-        self.lang_score = score_total
+        self.lang_score = 0.0
+        # Only its own sentences have any score, so just iterate over
+        # them.
+        for s in self.sentences:
+            self.lang_score += s.score * self.sentence_match_probs[s]
+        return
+
+    def cmp(cmd1, cmd2):
+        '''
+        Compares commands for sorting. This is the replacement for the
+        'get_final_p' function and 'final_p' attribute. We do this
+        because how we rank commands is meaningful relative to
+        each-other, but hard to do in an absolute way.
+
+        Implementation-specific details are varying greatly during the
+        course of this project, so see the code for details.
+
+        Args:
+            cmd1 (Command)
+            cmd2 (Command)
+
+        Returns:
+            int: n such that
+                n < 0 if cmd1 comes before cmd2
+                n == 0 if cmd1 comes at the same place as cmd2
+                n > 0 if cmd2 comes before cmd1
+        '''
+        if Numbers.are_floats_close(
+                cmd1.lang_score, cmd2.lang_score, LANGUAGE_TIE_EPSILON):
+            diff = cmd2.score - cmd1.score
+        else:
+            diff = cmd2.lang_score - cmd1.lang_score
+        if diff == 0:
+            return 0
+        else:
+            return -1 if diff < 0 else 1
 
     def get_final_p(self):
         '''
@@ -722,10 +738,25 @@ class Command:
 
         The result is stored in self.final_p.
         '''
-        self.final_p = self.score * self.lang_score
+        # Original:
+        # self.final_p = self.score * self.lang_score
+
+        # NOTE(mbforbes); We do this to break ties in language scores
+        # with the influence from the robot and world. The language
+        # score is desined to have a higher split so theoretically we
+        # could combine them with multiplication. However, this involves
+        # re-tuning weights when the probability distributions change
+        # (e.g. as more commands are introduced). What we want behavior-
+        # wise from the system is that it always follows language
+        # commands that are explicitly specified, and only tries to be
+        # "smart" by inferring missing or unclear paramaters when
+        # they're omitted. This may have to be modified slightly when
+        # we start taking into account uncertanty in language (though
+        # the underlying key concept still holds true).
+        self.final_p = self.score + self.lang_score
 
 
-class Parameter:
+class Parameter(object):
     '''A class that holds parameter info, including possible options.'''
 
     def __init__(self, name, options):
@@ -743,7 +774,7 @@ class Parameter:
         return ''.join(['<', self.name, '>'])
 
 
-class Option:
+class Option(object):
     '''Interface for options.'''
 
     def __repr__(self):
@@ -778,6 +809,10 @@ class WordOption(Option):
         self.name = name
         self.phrases = phrases
 
+        # Hook phrases up to their parent Option.
+        for p in phrases:
+            p.set_option(self)
+
     def get_phrases(self):
         '''
         Returns a list, where each element is a single-element list of
@@ -807,6 +842,7 @@ class ObjectOption(Option):
         self.name = world_obj.get_property('name')
         self.world_obj = world_obj
         self.word_options = self._get_word_options(options)
+        self.phrases = []  # Compute later and cache.
 
     def _get_word_options(self, options):
         '''
@@ -877,11 +913,12 @@ class ObjectOption(Option):
         Returns:
             [[Phrase]]
         '''
-        return Numbers.gen_phrases(self.word_options)
-        # return [Phrase(self.name, DefaultMatcher)]  # just use 'objn'
+        if len(self.phrases) == 0:
+            self.phrases = Algo.gen_phrases(self.word_options)
+        return self.phrases
 
 
-class Sentence:
+class Sentence(object):
     '''Our representation of a perfect 'utterance'.
 
     A series of phrases.
@@ -905,6 +942,30 @@ class Sentence:
         phrases = ' '.join(["'" + str(p) + "'" for p in self.phrases])
         return "%0.6f  %s" % (self.score, phrases)
 
+    def __eq__(self, other):
+        '''
+        Args:
+            other (Sentence)
+
+        Returns:
+            bool
+        '''
+        # Allow mismatched ordering.
+        for phrase in self.phrases:
+            if phrase not in other.get_phrases():
+                return False
+        return True
+
+    def __ne__(self, other):
+        '''
+        Args:
+            other (Sentence)
+
+        Returns:
+            bool
+        '''
+        return not self.__eq__(other)
+
     def get_raw(self):
         '''
         Returns just the sentences words as a string
@@ -921,34 +982,28 @@ class Sentence:
         '''
         return self.phrases
 
-    def score_match(self, utterance):
+    def score_with(self, other):
         '''
         Args:
-            utterance (str)
+            other (Sentence)
+
+        Returns:
+            float
         '''
-        total_score = 0.0
-        # Debug.pl(1, "Scoring sentence: " + str(self))
+        self.score = 0.0
         for phrase in self.phrases:
-            phrase_score = phrase.score(utterance)
-            total_score += phrase_score
-            # Debug
-            # Debug.pl(
-            #     2,
-            #     "%0.2f  score of phrase: %s" % (phrase_score, str(phrase)))
-
-        # Clamp scores so they're between 0 and 1 (i.e. a probability).
-        max_score = (
-            MatchingStrategy.verb_match +
-            (len(self.phrases) - 1) * MatchingStrategy.param_match)
-        self.score = (total_score / max_score)**LENGTH_EXP
-        # Debug
-        # assert self.score >= 0.0 and self.score <= 1.0
-        # Debug.pl(2, "Final score: " + str(self))
+            if phrase in other.phrases:
+                self.score += phrase.get_score()
 
 
-class Phrase:
+class Phrase(object):
     '''Holds a set of words and a matching strategy for determining if
     it is matched in an utterance.'''
+
+    # NOTE(mbforbes); This isn't thread-safe, but easily could be.
+    # (Well, Python is kind of inherantly thread-safe for a variable
+    # like this, but that's beside the point...)
+    next_uid = 0
 
     def __init__(self, words, strategy):
         '''
@@ -956,18 +1011,57 @@ class Phrase:
             words ([str])
             strategy (MatchingStrategy)
         '''
+        # For fast comparison between phrases.
+        self.uid = Phrase.next_uid
+        Phrase.next_uid += 1
+
         self.words = words
         self.strategy = strategy
+        self.score = strategy.score()
 
-    def score(self, utterance):
+        # Phrases are created first, so their parent Option is set later
+        # through set_option(...).
+        self.option = None
+
+    def set_option(self, option):
+        '''
+        Sets this Phrase's parent Option.
+
+        Args:
+            option (Option)
+        '''
+        self.option = option
+
+    def get_score(self):
+        '''
+        Returns:
+            float
+        '''
+        return self.score
+
+    def found_in(self, utterance):
         '''
         Args:
             utterance (str)
 
         Returns:
-            float
+            bool
         '''
         return self.strategy.match(self.words, utterance)
+
+    # NOTE(mbforbes): A good idea, and this functionality needs to be
+    # somewhere. Just not precisely sure where yet.
+    # def score_phrases(self, other):
+    #     '''
+    #     Scores one phrase versus a set of others.
+
+    #     Different scores apply.
+    #     - A high score is given if a match is found.
+    #     - A low score is given if no match is found, but no
+    #       contradiction (different option) is either.
+    #     - A very low score is given if a contradiction is found.
+    #     '''
+    #     pass
 
     def __repr__(self):
         '''
@@ -984,7 +1078,8 @@ class Phrase:
         Returns:
             bool
         '''
-        return self.words == other.words
+        return self.uid == other.uid
+        # return self.words == other.words and self.strategy == other.strategy
 
     def __ne__(self, other):
         '''
@@ -994,10 +1089,10 @@ class Phrase:
         Returns:
             bool
         '''
-        return self.words != other.words
+        return not self.__eq__(other)
 
 
-class WorldObject:
+class WorldObject(object):
     '''
     Contains data about the properties of an object in the world.
 
@@ -1149,7 +1244,7 @@ class WorldObject:
             self.get_property(prop) == other.get_property(prop))
 
 
-class Robot:
+class Robot(object):
     '''
     Provides an interface for accessing robot data.
     '''
@@ -1180,10 +1275,15 @@ class Robot:
         '''
         props = {}
 
-        # Check properties before adding.
+        # Uncheckable properties (e.g. bools).
+        props['is_executing'] = robot_state.is_executing
+
+        # Check checkable properties before adding.
+        # Strings (must have characters).
         if len(robot_state.last_cmd_side) > 0:
             props['last_cmd_side'] = robot_state.last_cmd_side
 
+        # Lists (must be non-empty).
         if len(robot_state.gripper_states) == 2:
             props['gripper_states'] = robot_state.gripper_states
 
@@ -1229,7 +1329,7 @@ class Robot:
         return self.properties[name]
 
 
-class RobotCommand:
+class RobotCommand(object):
     '''A Command wrapper that will generate objects in the forms that
     will be returned to the robot (or something close for us humans to
     read).
@@ -1314,10 +1414,10 @@ class RobotCommand:
         return ': '.join([self.name, ', '.join(self.args)])
 
 
-class Parser:
+class Parser(object):
 
     # Couple settings (currently for debugging)
-    display_limit = 25
+    display_limit = 30
 
     def __init__(
             self, grammar_yaml=COMMAND_GRAMMAR, buffer_printing=False,
@@ -1338,6 +1438,7 @@ class Parser:
         self.world_objects = None
         self.world_objects_for_generation = None
         self.robot = None
+        self.phrases = None
         self.templates = None
         self.commands = None
 
@@ -1522,12 +1623,18 @@ class Parser:
 
         Info.p("Parser received utterance: " + utterance)
 
+        # Translate utterance->Phrases.
+        utterance_phrases = [p for p in self.phrases if p.found_in(utterance)]
+        Info.p('Utterance phrases: ' + str(utterance_phrases))
+        u_sentence = Sentence(utterance_phrases)
+
         # Score sentences.
         for s in self.sentences:
-            s.score_match(utterance)
+            s.score_with(u_sentence)
+        Numbers.make_prob(self.sentences)
         # Numbers.boost(self.sentences)  # boost? or
         # Numbers.normalize(self.sentences, 'score')  # norm?
-        self.sentences = sorted(self.sentences, key=lambda x: -x.score)
+        self.sentences.sort(key=attrgetter('score'), reverse=True)
 
         # Apply L.
         Command.apply_l_precheck(self.commands, self.sentences)
@@ -1536,10 +1643,15 @@ class Parser:
         # Numbers.boost(self.commands, 'lang_score')  # boost? or
         Numbers.normalize(self.commands, 'lang_score')  # norm?
 
-        # Get combined probability.
-        for c in self.commands:
-            c.get_final_p()
-        Numbers.normalize(self.commands, 'final_p')  # norm?
+        # Sort by command scores first (mixed up from last parse).
+        # self.commands = sorted(self.commands, key=lambda x: -x.score)
+
+        # Sort by language to get top. Because python sorting is stable,
+        # language-tied entires with higher command scores will be
+        # higher.
+        # self.commands = sorted(self.commands, key=lambda x: -x.lang_score)
+
+        self.commands.sort(cmp=Command.cmp)
 
         # Display sentences.
         Info.p('Top %d sentences:' % (Parser.display_limit))
@@ -1548,15 +1660,13 @@ class Parser:
                 Info.pl(1, s)
 
         # Display commands.
-        self.commands = sorted(self.commands, key=lambda x: -x.final_p)
-        ptot = 0.0
         Info.p("Top %d commands:" % (Parser.display_limit))
         for idx, c in enumerate(self.commands):
             if idx < Parser.display_limit:
                 Info.pl(1, c)
-            ptot += c.final_p
-        Info.p('Total (%d): %0.2f' % (len(self.commands), ptot))
 
+        # We return a new representation of the command as well as some
+        # logging buffers (perhaps) for display.
         ret = (
             RobotCommand.from_command(self.commands[0]),
             '\n'.join([self.start_buffer, self.get_print_buffer()])
@@ -1609,7 +1719,8 @@ class Parser:
 
         # Make templates (this extracts options and params).
         self.world_objects_for_generation = self.world_objects
-        self.templates = self.command_dict.make_templates(self.world_objects)
+        self.phrases, self.templates = self.command_dict.get_grammar(
+            self.world_objects)
         Debug.p('Templates:')
         for t in self.templates:
             Debug.pl(1, t)
@@ -1704,14 +1815,17 @@ class Parser:
         Numbers.normalize(self.commands, min_score=MIN_SCORE)
 
         # Display commands.
-        self.commands = sorted(self.commands, key=lambda x: -x.score)
-        ptot = 0.0
+        self.commands.sort(key=attrgetter('score'), reverse=True)
         Info.p("Top commands (before utterance):")
         for idx, c in enumerate(self.commands):
             if idx < Parser.display_limit:
                 Info.pl(1, c)
-            ptot += c.score
-        Info.p('Total (%d): %0.2f' % (len(self.commands), ptot))
+        Info.p(
+            'Total (%d): %0.2f' % (
+                len(self.commands),
+                sum([c.score for c in self.commands])
+            )
+        )
 
 
 ########################################################################
@@ -1759,13 +1873,13 @@ def play(parser):
     }
     objs = [
         WorldObject(o_right_possible),
-        # WorldObject(o_left_possible_second),
+        WorldObject(o_left_possible_second),
     ]
 
     parser.set_world(world_objects=objs)
     # parser.print_sentences()
-    parser.update_robot(robot=Robot({'last_cmd_side': 'left_hand'}))
-    parser.set_world(world_objects=objs)
+    # parser.update_robot(robot=Robot({'last_cmd_side': 'left_hand'}))
+    # parser.set_world(world_objects=objs)
     parser.interactive_loop()
 
 

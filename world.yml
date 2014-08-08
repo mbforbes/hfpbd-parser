@@ -23,7 +23,10 @@ robot:
     gripper_states: [closed_empty, closed_empty]
     # right_hand, left_hand, neither
     last_cmd_side: left_hand
+    is_executing: false
     can_move_up: [true, true]
     can_move_down: [false, false]
     can_move_toleft: [true, true]
     can_move_toright: [false, true]
+    can_move_forward: [false, false]
+    can_move_backward: [true, true]
