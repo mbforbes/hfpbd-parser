@@ -30,8 +30,8 @@ Here's the process:
         use P(u|L) and marginalize L across P(L|C) to get P(C|u)).
 
     - Combine the w, r-induced probability P(C|w,r) with the language
-        score P(C|u) to get the final probability P(C|u,w,r).
-        (Command.final_p).
+        score P(C|u) to get the final probability P(C|u,w,r). Currently
+        use language score first, then command score to break ties.
 '''
 
 __author__ = 'mbforbes'
@@ -99,10 +99,6 @@ M_WO = {
     'is_biggest': 'biggest',
     'is_smallest': 'smallest',
 }
-
-# General scoring
-# TODO(mbforbes): Remove once tests are passing!!!
-LENGTH_EXP = 10.0  # Polynomial degree for weight by length (x^this).
 
 # Command score
 START_SCORE = 1.0  # To begin with. Maybe doesn't matter.
@@ -365,9 +361,6 @@ class Command(object):
     Has state: YES
     '''
 
-    # Whether to do some internal checking during each parse.
-    debug = False
-
     def __init__(self, name, option_map, template):
         '''
         Args:
@@ -385,13 +378,10 @@ class Command(object):
         self.score = START_SCORE
 
         # P(L|C)
-        self.sentence_match_probs = defaultdict(float)
+        self.sentence_match_probs = defaultdict(float)  # Default: 0.0.
 
         # P(L|C) * P(L) (marginalize across L)
         self.lang_score = 0.0
-
-        # P(C|W,R) * P(L|W,R,C)
-        self.final_p = 0.0
 
     def __repr__(self):
         '''
@@ -431,10 +421,7 @@ class Command(object):
             str
         '''
         score_str = "score: %0.4f" % (self.score)
-        if self.lang_score != 0.0:
-            score_str += ", lang_score: %0.4f" % (self.lang_score)
-        if self.final_p != 0.0:
-            score_str += ", final_p: %0.4f" % (self.final_p)
+        score_str += ", lang_score: %0.4f" % (self.lang_score)
         return score_str
 
     def _name_str(self):
@@ -457,60 +444,6 @@ class Command(object):
         '''
         return ', '.join([': '.join(
             [str(k), str(v)]) for k, v in self.option_map.iteritems()])
-
-    @staticmethod
-    def apply_l_precheck(commands, sentences):
-        '''
-        Checks that numbers are sane. Should be called before apply_l
-        (not enforced).
-
-        This does nothing if Command.debug is False.
-
-        Args:
-            commands ([Command])
-            sentences ([Sentence])
-        '''
-        if not Command.debug:
-            return
-
-        # NOTE(mbforbes); This kind of thing may be useful once
-        # everything is finalized. But even then maybe not.
-
-        # Ensure command scores are normalized.
-        # sum_ = sum(c.score for c in commands)
-        # if not Numbers.are_floats_close(sum_, 1.0):
-        #     Error.p('Command scores are not normed: %0.3f' % (sum_))
-        #     sys.exit(1)
-
-        # Ensure sentence scores normalized.
-        # sum_ = sum(s.score for s in sentences)
-        # if not Numbers.are_floats_close(sum_, 1.0):
-        #     Error.p('Sentence scores are not normed: %0.3f' % (sum_))
-        #     sys.exit(1)
-
-        # Check a few things for all commands.
-        # for c in commands:
-        #     # Quick check whether sentence_match_probs reasonable.
-        #     if len(c.sentence_match_probs) != len(sentences):
-        #         Error.p('Must score_match_sentences before apply_l.')
-        #         sys.exit(1)
-
-        #     # Ensure all sentences pre-matched with this command.
-        #     for s in sentences:
-        #         if s not in c.sentence_match_probs.keys():
-        #             Error.p(
-        #                 ('Command %s sentence_match_probs missing ' +
-        #                     'sentence: %s') % (str(c), str(s)))
-        #             sys.exit(1)
-
-            # # Ensure sentence match scores normalized.
-            # sum_ = sum(
-            #     p for s, p in c.sentence_match_probs.iteritems())
-            # if not Numbers.are_floats_close(sum_, 1.0):
-            #     Error.p(
-            #         'Command sentence_match_probs not normed: %0.3f'
-            #         % (sum_))
-            #     sys.exit(1)
 
     def generate_sentences(self):
         '''
@@ -732,30 +665,6 @@ class Command(object):
         else:
             return -1 if diff < 0 else 1
 
-    def get_final_p(self):
-        '''
-        Calculates final probability of command by combining P(C|W,R)
-        and P(L|W,R).
-
-        The result is stored in self.final_p.
-        '''
-        # Original:
-        # self.final_p = self.score * self.lang_score
-
-        # NOTE(mbforbes); We do this to break ties in language scores
-        # with the influence from the robot and world. The language
-        # score is desined to have a higher split so theoretically we
-        # could combine them with multiplication. However, this involves
-        # re-tuning weights when the probability distributions change
-        # (e.g. as more commands are introduced). What we want behavior-
-        # wise from the system is that it always follows language
-        # commands that are explicitly specified, and only tries to be
-        # "smart" by inferring missing or unclear paramaters when
-        # they're omitted. This may have to be modified slightly when
-        # we start taking into account uncertanty in language (though
-        # the underlying key concept still holds true).
-        self.final_p = self.score + self.lang_score
-
 
 class Parameter(object):
     '''A class that holds parameter info, including possible options.'''
@@ -809,10 +718,6 @@ class WordOption(Option):
     def __init__(self, name, phrases):
         self.name = name
         self.phrases = phrases
-
-        # Hook phrases up to their parent Option.
-        for p in phrases:
-            p.set_option(self)
 
     def get_phrases(self):
         '''
@@ -983,28 +888,41 @@ class Sentence(object):
         '''
         return self.phrases
 
-    def score_with(self, other):
+    @staticmethod
+    def compute_score(sentences, u_sentence):
         '''
         Args:
-            other (Sentence)
-
-        Returns:
-            float
+            sentences ([Sentence]): Sentences to score.
+            u_sentence (Sentence): The utterance as a Sentence.
         '''
-        self.score = 0.0
-        for phrase in self.phrases:
-            if phrase in other.phrases:
-                self.score += phrase.get_score()
+        u_phrases = u_sentence.get_phrases()
+
+        # Mark phrases as seen.
+        for p in u_phrases:
+            p.seen = True
+
+        # Score all sentences by adding scores of seen phrases.
+        for sentence in sentences:
+            sentence.score = 0.0
+            for phrase in sentence.phrases:
+                if phrase.seen:
+                    sentence.score += phrase.get_score()
+
+        # Unmark
+        for p in u_phrases:
+            p.seen = False
+
+        # Normalize
+        Numbers.make_prob(sentences)
 
 
 class Phrase(object):
     '''Holds a set of words and a matching strategy for determining if
-    it is matched in an utterance.'''
+    it is matched in an utterance.
 
-    # NOTE(mbforbes); This isn't thread-safe, but easily could be.
-    # (Well, Python is kind of inherantly thread-safe for a variable
-    # like this, but that's beside the point...)
-    next_uid = 0
+    Has state: only briefly, and only during
+    Sentence::compute_score(...).
+    '''
 
     def __init__(self, words, strategy):
         '''
@@ -1012,26 +930,12 @@ class Phrase(object):
             words ([str])
             strategy (MatchingStrategy)
         '''
-        # For fast comparison between phrases.
-        self.uid = Phrase.next_uid
-        Phrase.next_uid += 1
-
         self.words = words
         self.strategy = strategy
         self.score = strategy.score()
 
-        # Phrases are created first, so their parent Option is set later
-        # through set_option(...).
-        self.option = None
-
-    def set_option(self, option):
-        '''
-        Sets this Phrase's parent Option.
-
-        Args:
-            option (Option)
-        '''
-        self.option = option
+        # Mark when seen by an utterance.
+        self.seen = False
 
     def get_score(self):
         '''
@@ -1050,47 +954,12 @@ class Phrase(object):
         '''
         return self.strategy.match(self.words, utterance)
 
-    # NOTE(mbforbes): A good idea, and this functionality needs to be
-    # somewhere. Just not precisely sure where yet.
-    # def score_phrases(self, other):
-    #     '''
-    #     Scores one phrase versus a set of others.
-
-    #     Different scores apply.
-    #     - A high score is given if a match is found.
-    #     - A low score is given if no match is found, but no
-    #       contradiction (different option) is either.
-    #     - A very low score is given if a contradiction is found.
-    #     '''
-    #     pass
-
     def __repr__(self):
         '''
         Returns:
             str
         '''
         return self.words
-
-    def __eq__(self, other):
-        '''
-        Args:
-            other (Phrase)
-
-        Returns:
-            bool
-        '''
-        return self.uid == other.uid
-        # return self.words == other.words and self.strategy == other.strategy
-
-    def __ne__(self, other):
-        '''
-        Args:
-            other (Phrase)
-
-        Returns:
-            bool
-        '''
-        return not self.__eq__(other)
 
 
 class WorldObject(object):
@@ -1420,13 +1289,9 @@ class Parser(object):
     # Couple settings (currently for debugging)
     display_limit = 30
 
-    def __init__(
-            self, grammar_yaml=COMMAND_GRAMMAR, buffer_printing=False,
-            debug=False):
+    def __init__(self, grammar_yaml=COMMAND_GRAMMAR, buffer_printing=False):
         # If set, logger saves ouput
         Logger.buffer_printing = buffer_printing
-        # If set, do some internal checking during each parse.
-        Command.debug = debug
 
         # Load
         self.command_dict = CommandDict(yaml.load(open(grammar_yaml)))
@@ -1491,8 +1356,8 @@ class Parser(object):
     def startup_ros(self):
         '''ROS-specific: Sets up callbacks for
             - recognized speech from pocketsphinx
-            - world state updates (TODO)
-            - robot state updates (TODO)
+            - world state updates
+            - robot state updates
         and publishers for
             - HandsFreeCommand
         '''
@@ -1606,10 +1471,10 @@ class Parser(object):
             self._update_world_internal()
         self.lock.release()
 
-    def parse(self, utterance):
+    def parse(self, u):
         '''
         Args:
-            utterance (str)
+            u (str): utterance
 
         Returns:
             (RobotCommand,str): 2-tuple of
@@ -1618,63 +1483,54 @@ class Parser(object):
                     has been buffered.
         '''
         self.lock.acquire()
+
+        # Sanity check for state.
         if self.world_objects is None or self.robot is None:
             Error.p('Must set Parser world_objects and robot before parse().')
             sys.exit(1)
 
-        Info.p("Parser received utterance: " + utterance)
-
-        # Translate utterance->Phrases.
-        utterance_phrases = [p for p in self.phrases if p.found_in(utterance)]
-        Info.p('Utterance phrases: ' + str(utterance_phrases))
-        u_sentence = Sentence(utterance_phrases)
-
-        # Score sentences.
-        for s in self.sentences:
-            s.score_with(u_sentence)
-        Numbers.make_prob(self.sentences)
-        # Numbers.boost(self.sentences)  # boost? or
-        # Numbers.normalize(self.sentences, 'score')  # norm?
-        self.sentences.sort(key=attrgetter('score'), reverse=True)
+        # Translate utterance->Phrases and score all sentences.
+        Info.p("Parser received utterance: " + u)
+        u_sentence = Sentence([p for p in self.phrases if p.found_in(u)])
+        Info.p('Utterance phrases: ' + str(u_sentence.get_phrases()))
+        Sentence.compute_score(self.sentences, u_sentence)
 
         # Apply L.
-        Command.apply_l_precheck(self.commands, self.sentences)
         for c in self.commands:
             c.apply_l(self.sentences)
-        # Numbers.boost(self.commands, 'lang_score')  # boost? or
-        Numbers.normalize(self.commands, 'lang_score')  # norm?
+        Numbers.normalize(self.commands, 'lang_score')
 
-        # Sort by command scores first (mixed up from last parse).
-        # self.commands = sorted(self.commands, key=lambda x: -x.score)
-
-        # Sort by language to get top. Because python sorting is stable,
-        # language-tied entires with higher command scores will be
-        # higher.
-        # self.commands = sorted(self.commands, key=lambda x: -x.lang_score)
-
+        # Get top command (calculated by Command.cmp).
         self.commands.sort(cmp=Command.cmp)
-
-        # Display sentences.
-        Info.p('Top %d sentences:' % (Parser.display_limit))
-        for idx, s in enumerate(self.sentences):
-            if idx < Parser.display_limit:
-                Info.pl(1, s)
-
-        # Display commands.
-        Info.p("Top %d commands:" % (Parser.display_limit))
-        for idx, c in enumerate(self.commands):
-            if idx < Parser.display_limit:
-                Info.pl(1, c)
 
         # We return a new representation of the command as well as some
         # logging buffers (perhaps) for display.
+        self._log_results()
         ret = (
             RobotCommand.from_command(self.commands[0]),
             '\n'.join([self.start_buffer, self.get_print_buffer()])
         )
-        self.lock.release()
 
+        self.lock.release()
         return ret
+
+    def _log_results(self):
+        '''
+        Write results of parse to log.
+        '''
+        if Info.printing:
+            # Display sentences.
+            self.sentences.sort(key=attrgetter('score'), reverse=True)
+            Info.p('Top %d sentences:' % (Parser.display_limit))
+            for idx, s in enumerate(self.sentences):
+                if idx < Parser.display_limit:
+                    Info.pl(1, s)
+
+            # Display commands.
+            Info.p("Top %d commands:" % (Parser.display_limit))
+            for idx, c in enumerate(self.commands):
+                if idx < Parser.display_limit:
+                    Info.pl(1, c)
 
     def set_default_world(self):
         '''

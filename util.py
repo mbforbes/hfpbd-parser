@@ -26,7 +26,7 @@ LENGTH_EXP = 10.0  # Polynomial degree for weight by length (x^this).
 # Classes
 # ######################################################################
 
-class Logger:
+class Logger(object):
     '''
     Handles logging. Optionally saves output in buffer for displaying.
 

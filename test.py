@@ -287,12 +287,8 @@ class TestUtil:
         Returns:
             bool: Whether we're running on Travis-CI
         '''
-        # NOTE(mbforbes): Disabling for now as system is running so
-        # slowly with thousands of sentences that travis thinks it's
-        # crashed if we have debugging on.
-        return False
         # True "on travis?" test:
-        # return getpass.getuser() == 'travis'
+        return getpass.getuser() == 'travis'
 
 
 class TestDefaultMatcher(unittest.TestCase):
@@ -317,7 +313,7 @@ class FullNoContext(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
         self.parser.set_world()
 
     def test_openclose(self):
@@ -335,7 +331,7 @@ class FullInferOpenClose(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
 
     def test_pick_open(self):
         # We're going to weight against the last commanded side.
@@ -388,7 +384,7 @@ class FullOneObjNoRobot(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
         objs = [WorldObject(O_FULL_REACHABLE)]
         self.parser.set_world(world_objects=objs)
 
@@ -497,7 +493,7 @@ class FullOneObjRobotSidePref(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
         objs = [WorldObject(O_FULL_REACHABLE)]
         # NOTE: Only 'update objects' called; this ensures we must
         # update the robot in each test method before the parser will
@@ -568,7 +564,7 @@ class FullRobotOneSidePossible(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
 
     def test_only_right_possible(self):
         # Trying with no objects; focus is on ROBOT state.
@@ -610,7 +606,7 @@ class FullObjectOneSidePossible(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
 
     def test_only_right_possible(self):
         # Trying with no robot; focus is on OBJECT state.
@@ -657,7 +653,7 @@ class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
         objs = [WorldObject(O_FULL_REACHABLE)]
         # NOTE: Only 'update objects' called; this ensures we must
         # update the robot in each test method before the parser will
@@ -731,7 +727,7 @@ class FullMultiObjectsSimple(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
         objs = [
             WorldObject(O_FULL_REACHABLE),  # obj0
             WorldObject(O_FULL_REACHABLE_SECOND),  # obj1
@@ -794,7 +790,7 @@ class FullMultiObjectsPickHand(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
         objs = [
             WorldObject(O_RIGHT_POSSIBLE),  # obj0
             WorldObject(O_LEFT_POSSIBLE_SECOND),  # obj1
@@ -867,7 +863,7 @@ class FullImpossibleRobotCommands:
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
 
     def test_impossible_openclose(self):
         robot = Robot({
@@ -916,7 +912,7 @@ class FullImpossibleObjCommands:
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser(debug=TestUtil.on_travis())
+        self.parser = Parser()
         objs = [
             WorldObject(O_IMPOSSIBLE),  # obj0
         ]
