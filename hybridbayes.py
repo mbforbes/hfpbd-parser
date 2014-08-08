@@ -120,6 +120,7 @@ P_BADPP = -5.0  # Penalty: bad pickup/place command requested (from GS)
 # needs to be tuned as the number of comamnds (sentences) grows.
 LANGUAGE_TIE_EPSILON = 0.001
 
+
 ########################################################################
 # Classes
 ########################################################################

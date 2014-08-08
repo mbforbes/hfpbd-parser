@@ -21,6 +21,7 @@ DEBUG_PRINTING_DEFAULT = True
 FLOAT_COMPARE_EPSILON = 0.001
 LENGTH_EXP = 10.0  # Polynomial degree for weight by length (x^this).
 
+
 # ######################################################################
 # Classes
 # ######################################################################
