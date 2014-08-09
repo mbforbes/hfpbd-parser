@@ -3,6 +3,26 @@
 Current test categories include:
     - Matcher: matcher tests (phrase matching)
     - Full: end-to-end tests (of entire system)
+
+Tests for Full include
+    [ ] Action 1: move ( abs_pose , arm_side )
+    [x] Action 2: move ( rel_pose , object , arm_side )
+    [x] Action 3: move ( abs_direction , arm_side )
+    [ ] Action 4: move ( rel_direction , object , arm_side )
+    [ ] Action 5: place ( abs_pose , arm_side )
+    [x] Action 6: place ( rel_pose , object , arm_side )
+    [x] Action 7: pick_up ( object , arm_side )
+    [ ] Action 8: point_to ( object , arm_side )
+    [ ] Action 9: rotate ( joint , rotation_direction )
+    [x] Action 10: look_at ( object )
+    [x] Action 11: open ( arm_side )
+    [x] Action 12: close ( arm_side )
+
+    Plus 'admin' commands:
+    [ ] Create new action
+    [ ] Switch to action ( which )
+    [ ] Execute
+    [ ] Stop
 '''
 
 __author__ = 'mbforbes'
@@ -37,16 +57,35 @@ S_MOVEABS = {
     'LH_DOWN': 'move left-hand down',
     'LH_LEFT': 'move left-hand left',
     'LH_RIGHT': 'move left-hand right',
+    'LH_FORWARD': 'move left-hand forward',
+    'LH_BACKWARD': 'move left-hand backwards',
+
     'RH_UP': 'move right-hand up',
     'RH_DOWN': 'move right-hand down',
     'RH_LEFT': 'move right-hand left',
     'RH_RIGHT': 'move right-hand right',
+    'RH_FORWARD': 'move right-hand forward',
+    'RH_BACKWARD': 'move right-hand backwards',
 }
 S_MOVEREL = {
     'RH_ABOVE': 'move right-hand above the red box',
     'RH_NEXTTO': 'move right-hand next-to the red box',
+    'RH_LEFTOF': 'move right-hand to-the-left-of the red box',
+    'RH_RIGHTOF': 'move right-hand to-the-right-of the red box',
+    'RH_FRONTOF': 'move right-hand in-front-of the red box',
+    'RH_BEHIND': 'move right-hand behind the red box',
+    'RH_TOPOF': 'move right-hand on-top-of the red box',
+    'RH_NEAR': 'move right-hand near the red box',
+
     'LH_ABOVE': 'move left-hand above the red box',
     'LH_NEXTTO': 'move left-hand next-to the red box',
+    'LH_LEFTOF': 'move left-hand to-the-left-of the red box',
+    'LH_RIGHTOF': 'move left-hand to-the-right-of the red box',
+    'LH_FRONTOF': 'move left-hand in-front-of the red box',
+    'LH_BEHIND': 'move left-hand behind the red box',
+    'LH_TOPOF': 'move left-hand on-top-of the red box',
+    'LH_NEAR': 'move left-hand near the red box',
+
 
 }
 S_PICKUP = {
@@ -56,8 +95,22 @@ S_PICKUP = {
 S_PLACE = {
     'PL_RH_ABOVE': 'place above the red box with your right-hand',
     'PL_RH_NEXTTO': 'place next-to the red box with your right-hand',
+    'PL_RH_LEFTOF': 'place to-the-left-of the red box with your right-hand',
+    'PL_RH_RIGHTOF': 'place to-the-right-of the red box with your right-hand',
+    'PL_RH_FRONTOF': 'place in-front-of the red box with your right-hand',
+    'PL_RH_BEHIND': 'place behind the red box with your right-hand',
+    'PL_RH_TOPOF': 'place on-top-of the red box with your right-hand',
+    'PL_RH_NEAR': 'place near the red box with your right-hand',
+
     'PL_LH_ABOVE': 'place above the red box with your left-hand',
     'PL_LH_NEXTTO': 'place next-to the red box with your left-hand',
+    'PL_LH_LEFTOF': 'place to-the-left-of the red box with your left-hand',
+    'PL_LH_RIGHTOF': 'place to-the-right-of the red box with your left-hand',
+    'PL_LH_FRONTOF': 'place in-front-of the red box with your left-hand',
+    'PL_LH_BEHIND': 'place behind the red box with your left-hand',
+    'PL_LH_TOPOF': 'place on-top-of the red box with your left-hand',
+    'PL_LH_NEAR': 'place near the red box with your left-hand',
+
 }
 S_LOOKAT = {
     'LOOKAT': 'look at the red box',
@@ -79,6 +132,10 @@ RC_MOVEABS = {
         'move_abs', ['left_hand', 'to_left']),
     'LH_RIGHT': RobotCommand.from_strs(
         'move_abs', ['left_hand', 'to_right']),
+    'LH_FORWARD': RobotCommand.from_strs(
+        'move_abs', ['left_hand', 'forward']),
+    'LH_BACKWARD': RobotCommand.from_strs(
+        'move_abs', ['left_hand', 'backward']),
     'RH_UP': RobotCommand.from_strs(
         'move_abs', ['right_hand', 'up']),
     'RH_DOWN': RobotCommand.from_strs(
@@ -87,6 +144,10 @@ RC_MOVEABS = {
         'move_abs', ['right_hand', 'to_left']),
     'RH_RIGHT': RobotCommand.from_strs(
         'move_abs', ['right_hand', 'to_right']),
+    'RH_FORWARD': RobotCommand.from_strs(
+        'move_abs', ['right_hand', 'forward']),
+    'RH_BACKWARD': RobotCommand.from_strs(
+        'move_abs', ['right_hand', 'backward']),
 }
 RC_MOVEREL = {
     # obj0
@@ -94,19 +155,68 @@ RC_MOVEREL = {
         'move_rel', ['right_hand', 'above', 'obj0']),
     'RH_NEXTTO': RobotCommand.from_strs(
         'move_rel', ['right_hand', 'next_to', 'obj0']),
+    'RH_LEFTOF': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'to_left_of', 'obj0']),
+    'RH_RIGHTOF': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'to_right_of', 'obj0']),
+    'RH_FRONTOF': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'in_front_of', 'obj0']),
+    'RH_BEHIND': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'behind', 'obj0']),
+    'RH_TOPOF': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'on_top_of', 'obj0']),
+    'RH_NEAR': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'near', 'obj0']),
     'LH_ABOVE': RobotCommand.from_strs(
         'move_rel', ['left_hand', 'above', 'obj0']),
     'LH_NEXTTO': RobotCommand.from_strs(
         'move_rel', ['left_hand', 'next_to', 'obj0']),
-    # obj1
+    'LH_LEFTOF': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'to_left_of', 'obj0']),
+    'LH_RIGHTOF': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'to_right_of', 'obj0']),
+    'LH_FRONTOF': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'in_front_of', 'obj0']),
+    'LH_BEHIND': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'behind', 'obj0']),
+    'LH_TOPOF': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'on_top_of', 'obj0']),
+    'LH_NEAR': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'near', 'obj0']),
+
+    # obj1 new
     'RH_ABOVE2': RobotCommand.from_strs(
         'move_rel', ['right_hand', 'above', 'obj1']),
     'RH_NEXTTO2': RobotCommand.from_strs(
         'move_rel', ['right_hand', 'next_to', 'obj1']),
+    'RH_LEFTOF2': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'to_left_of', 'obj1']),
+    'RH_RIGHTOF2': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'to_right_of', 'obj1']),
+    'RH_FRONTOF2': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'in_front_of', 'obj1']),
+    'RH_BEHIND2': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'behind', 'obj1']),
+    'RH_TOPOF2': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'on_top_of', 'obj1']),
+    'RH_NEAR2': RobotCommand.from_strs(
+        'move_rel', ['right_hand', 'near', 'obj1']),
     'LH_ABOVE2': RobotCommand.from_strs(
         'move_rel', ['left_hand', 'above', 'obj1']),
     'LH_NEXTTO2': RobotCommand.from_strs(
         'move_rel', ['left_hand', 'next_to', 'obj1']),
+    'LH_LEFTOF2': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'to_left_of', 'obj1']),
+    'LH_RIGHTOF2': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'to_right_of', 'obj1']),
+    'LH_FRONTOF2': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'in_front_of', 'obj1']),
+    'LH_BEHIND2': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'behind', 'obj1']),
+    'LH_TOPOF2': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'on_top_of', 'obj1']),
+    'LH_NEAR2': RobotCommand.from_strs(
+        'move_rel', ['left_hand', 'near', 'obj1']),
 }
 RC_PICKUP = {
     # obj0
@@ -127,19 +237,71 @@ RC_PLACE = {
         'place', ['above', 'obj0', 'right_hand']),
     'PL_RH_NEXTTO': RobotCommand.from_strs(
         'place', ['next_to', 'obj0', 'right_hand']),
+    'PL_RH_LEFTOF': RobotCommand.from_strs(
+        'place', ['to_left_of', 'obj0', 'right_hand']),
+    'PL_RH_RIGHTOF': RobotCommand.from_strs(
+        'place', ['to_right_of', 'obj0', 'right_hand']),
+    'PL_RH_FRONTOF': RobotCommand.from_strs(
+        'place', ['in_front_of', 'obj0', 'right_hand']),
+    'PL_RH_BEHIND': RobotCommand.from_strs(
+        'place', ['behind', 'obj0', 'right_hand']),
+    'PL_RH_TOPOF': RobotCommand.from_strs(
+        'place', ['on_top_of', 'obj0', 'right_hand']),
+    'PL_RH_NEAR': RobotCommand.from_strs(
+        'place', ['near', 'obj0', 'right_hand']),
+
     'PL_LH_ABOVE': RobotCommand.from_strs(
         'place', ['above', 'obj0', 'left_hand']),
     'PL_LH_NEXTTO': RobotCommand.from_strs(
         'place', ['next_to', 'obj0', 'left_hand']),
-    # obj1
+    'PL_LH_LEFTOF': RobotCommand.from_strs(
+        'place', ['to_left_of', 'obj0', 'left_hand']),
+    'PL_LH_RIGHTOF': RobotCommand.from_strs(
+        'place', ['to_right_of', 'obj0', 'left_hand']),
+    'PL_LH_FRONTOF': RobotCommand.from_strs(
+        'place', ['in_front_of', 'obj0', 'left_hand']),
+    'PL_LH_BEHIND': RobotCommand.from_strs(
+        'place', ['behind', 'obj0', 'left_hand']),
+    'PL_LH_TOPOF': RobotCommand.from_strs(
+        'place', ['on_top_of', 'obj0', 'left_hand']),
+    'PL_LH_NEAR': RobotCommand.from_strs(
+        'place', ['near', 'obj0', 'left_hand']),
+
+
+    # new obj1
     'PL_RH_ABOVE2': RobotCommand.from_strs(
         'place', ['above', 'obj1', 'right_hand']),
     'PL_RH_NEXTTO2': RobotCommand.from_strs(
         'place', ['next_to', 'obj1', 'right_hand']),
+    'PL_RH_LEFTOF2': RobotCommand.from_strs(
+        'place', ['to_left_of', 'obj1', 'right_hand']),
+    'PL_RH_RIGHTOF2': RobotCommand.from_strs(
+        'place', ['to_right_of', 'obj1', 'right_hand']),
+    'PL_RH_FRONTOF2': RobotCommand.from_strs(
+        'place', ['in_front_of', 'obj1', 'right_hand']),
+    'PL_RH_BEHIND2': RobotCommand.from_strs(
+        'place', ['behind', 'obj1', 'right_hand']),
+    'PL_RH_TOPOF2': RobotCommand.from_strs(
+        'place', ['on_top_of', 'obj1', 'right_hand']),
+    'PL_RH_NEAR2': RobotCommand.from_strs(
+        'place', ['near', 'obj1', 'right_hand']),
+
     'PL_LH_ABOVE2': RobotCommand.from_strs(
         'place', ['above', 'obj1', 'left_hand']),
     'PL_LH_NEXTTO2': RobotCommand.from_strs(
         'place', ['next_to', 'obj1', 'left_hand']),
+    'PL_LH_LEFTOF2': RobotCommand.from_strs(
+        'place', ['to_left_of', 'obj1', 'left_hand']),
+    'PL_LH_RIGHTOF2': RobotCommand.from_strs(
+        'place', ['to_right_of', 'obj1', 'left_hand']),
+    'PL_LH_FRONTOF2': RobotCommand.from_strs(
+        'place', ['in_front_of', 'obj1', 'left_hand']),
+    'PL_LH_BEHIND2': RobotCommand.from_strs(
+        'place', ['behind', 'obj1', 'left_hand']),
+    'PL_LH_TOPOF2': RobotCommand.from_strs(
+        'place', ['on_top_of', 'obj1', 'left_hand']),
+    'PL_LH_NEAR2': RobotCommand.from_strs(
+        'place', ['near', 'obj1', 'left_hand']),
 }
 RC_LOOKAT = {
     # obj0
@@ -157,6 +319,12 @@ O_FULL_REACHABLE = {
     'is_pickupable': [True, True],
     'is_above_reachable': [True, True],
     'is_nextto_reachable': [True, True],
+    'is_leftof_reachable': [True, True],
+    'is_rightof_reachable': [True, True],
+    'is_frontof_reachable': [True, True],
+    'is_behind_reachable': [True, True],
+    'is_topof_reachable': [True, True],
+    'is_near_reachable': [True, True],
     # Relation to other objects. These should be more general.
     'is_leftmost': False,
     'is_rightmost': False,
@@ -175,6 +343,12 @@ O_RIGHT_POSSIBLE = {
     'is_pickupable': [True, False],
     'is_above_reachable': [True, False],
     'is_nextto_reachable': [True, False],
+    'is_leftof_reachable': [True, False],
+    'is_rightof_reachable': [True, False],
+    'is_frontof_reachable': [True, False],
+    'is_behind_reachable': [True, False],
+    'is_topof_reachable': [True, False],
+    'is_near_reachable': [True, False],
     'is_leftmost': False,
     'is_rightmost': True,
     'is_biggest': False,
@@ -191,6 +365,12 @@ O_LEFT_POSSIBLE = {
     'is_pickupable': [False, True],
     'is_above_reachable': [False, True],
     'is_nextto_reachable': [False, True],
+    'is_leftof_reachable': [False, True],
+    'is_rightof_reachable': [False, True],
+    'is_frontof_reachable': [False, True],
+    'is_behind_reachable': [False, True],
+    'is_topof_reachable': [False, True],
+    'is_near_reachable': [False, True],
     # E.g. red, blue, green, unknown
     'color': 'red',
     # E.g. cup, box, unknown
@@ -203,6 +383,12 @@ O_LEFT_POSSIBLE_SECOND = {
     'is_pickupable': [False, True],
     'is_above_reachable': [False, True],
     'is_nextto_reachable': [False, True],
+    'is_leftof_reachable': [False, True],
+    'is_rightof_reachable': [False, True],
+    'is_frontof_reachable': [False, True],
+    'is_behind_reachable': [False, True],
+    'is_topof_reachable': [False, True],
+    'is_near_reachable': [False, True],
     'is_leftmost': True,
     'is_rightmost': False,
     'is_biggest': True,
@@ -220,6 +406,12 @@ O_FULL_REACHABLE_SECOND = {
     'is_pickupable': [True, True],
     'is_above_reachable': [True, True],
     'is_nextto_reachable': [True, True],
+    'is_leftof_reachable': [True, True],
+    'is_rightof_reachable': [True, True],
+    'is_frontof_reachable': [True, True],
+    'is_behind_reachable': [True, True],
+    'is_topof_reachable': [True, True],
+    'is_near_reachable': [True, True],
     # Relation to other objects. These should be more general.
     'is_leftmost': False,
     'is_rightmost': False,
@@ -237,6 +429,12 @@ O_IMPOSSIBLE = {
     'is_pickupable': [False, False],
     'is_above_reachable': [False, False],
     'is_nextto_reachable': [False, False],
+    'is_leftof_reachable': [False, False],
+    'is_rightof_reachable': [False, False],
+    'is_frontof_reachable': [False, False],
+    'is_behind_reachable': [False, False],
+    'is_topof_reachable': [False, False],
+    'is_near_reachable': [False, False],
     # Relation to other objects. These should be more general.
     'is_leftmost': False,
     'is_rightmost': False,
@@ -261,18 +459,24 @@ R_ONLY_RIGHT_POSSIBLE = {
     'can_move_down': [True, False],
     'can_move_toleft': [True, False],
     'can_move_toright': [True, False],
+    'can_move_forward': [True, False],
+    'can_move_backward': [True, False],
 }
 R_ONLY_LEFT_POSSIBLE = {
     'can_move_up': [False, True],
     'can_move_down': [False, True],
     'can_move_toleft': [False, True],
     'can_move_toright': [False, True],
+    'can_move_forward': [False, True],
+    'can_move_backward': [False, True],
 }
 R_NEITHER_POSSIBLE = {
     'can_move_up': [False, False],
     'can_move_down': [False, False],
     'can_move_toleft': [False, False],
     'can_move_toright': [False, False],
+    'can_move_forward': [False, False],
+    'can_move_backward': [False, False],
 }
 
 
@@ -432,6 +636,12 @@ class FullOneObjNoRobot(unittest.TestCase):
             self.parser.parse('move right-gripper to-the-left')[0],
             RC_MOVEABS['RH_LEFT'])
         self.assertEqual(
+            self.parser.parse('move right-gripper away')[0],
+            RC_MOVEABS['RH_FORWARD'])
+        self.assertEqual(
+            self.parser.parse('move left-gripper closer')[0],
+            RC_MOVEABS['LH_BACKWARD'])
+        self.assertEqual(
             self.parser.parse('pick the red block up left-hand')[0],
             RC_PICKUP['LH'])
         self.assertEqual(
@@ -539,6 +749,12 @@ class FullOneObjRobotSidePref(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('move right')[0],
             RC_MOVEABS[rc_key_short + '_RIGHT'])
+        self.assertEqual(
+            self.parser.parse('move forward')[0],
+            RC_MOVEABS[rc_key_short + '_FORWARD'])
+        self.assertEqual(
+            self.parser.parse('move backwards')[0],
+            RC_MOVEABS[rc_key_short + '_BACKWARD'])
 
         # moverel
         self.assertEqual(
@@ -547,6 +763,24 @@ class FullOneObjRobotSidePref(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('move next-to the box')[0],
             RC_MOVEREL[rc_key_short + '_NEXTTO'])
+        self.assertEqual(
+            self.parser.parse('move to-the-left-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_LEFTOF'])
+        self.assertEqual(
+            self.parser.parse('move to-the-right-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_RIGHTOF'])
+        self.assertEqual(
+            self.parser.parse('move in-front-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_FRONTOF'])
+        self.assertEqual(
+            self.parser.parse('move behind the box')[0],
+            RC_MOVEREL[rc_key_short + '_BEHIND'])
+        self.assertEqual(
+            self.parser.parse('move on-top-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_TOPOF'])
+        self.assertEqual(
+            self.parser.parse('move near the box')[0],
+            RC_MOVEREL[rc_key_short + '_NEAR'])
 
         # pickup, place
         self.assertEqual(
@@ -558,6 +792,25 @@ class FullOneObjRobotSidePref(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('place next-to the box')[0],
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
+
+        self.assertEqual(
+            self.parser.parse('place to-the-left-of the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_LEFTOF'])
+        self.assertEqual(
+            self.parser.parse('place to-the-right-of the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF'])
+        self.assertEqual(
+            self.parser.parse('place in-front-of the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_FRONTOF'])
+        self.assertEqual(
+            self.parser.parse('place behind the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_BEHIND'])
+        self.assertEqual(
+            self.parser.parse('place on-top-of the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_TOPOF'])
+        self.assertEqual(
+            self.parser.parse('place near the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_NEAR'])
 
 
 class FullRobotOneSidePossible(unittest.TestCase):
@@ -600,6 +853,13 @@ class FullRobotOneSidePossible(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('move right')[0],
             RC_MOVEABS[rc_key_short + '_RIGHT'])
+        self.assertEqual(
+            self.parser.parse('move forward')[0],
+            RC_MOVEABS[rc_key_short + '_FORWARD'])
+        self.assertEqual(
+            self.parser.parse('move backwards')[0],
+            RC_MOVEABS[rc_key_short + '_BACKWARD'])
+
 
 
 class FullObjectOneSidePossible(unittest.TestCase):
@@ -634,6 +894,24 @@ class FullObjectOneSidePossible(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('move next-to the red box')[0],
             RC_MOVEREL[rc_key_short + '_NEXTTO'])
+        self.assertEqual(
+            self.parser.parse('move to-the-left-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_LEFTOF'])
+        self.assertEqual(
+            self.parser.parse('move to-the-right-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_RIGHTOF'])
+        self.assertEqual(
+            self.parser.parse('move in-front-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_FRONTOF'])
+        self.assertEqual(
+            self.parser.parse('move behind the box')[0],
+            RC_MOVEREL[rc_key_short + '_BEHIND'])
+        self.assertEqual(
+            self.parser.parse('move on-top-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_TOPOF'])
+        self.assertEqual(
+            self.parser.parse('move near the box')[0],
+            RC_MOVEREL[rc_key_short + '_NEAR'])
 
         # pickup
         self.assertEqual(
@@ -647,6 +925,24 @@ class FullObjectOneSidePossible(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('place next-to the red box')[0],
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
+        self.assertEqual(
+            self.parser.parse('place to-the-left-of the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_LEFTOF'])
+        self.assertEqual(
+            self.parser.parse('place to-the-right-of the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF'])
+        self.assertEqual(
+            self.parser.parse('place in-front-of the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_FRONTOF'])
+        self.assertEqual(
+            self.parser.parse('place behind the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_BEHIND'])
+        self.assertEqual(
+            self.parser.parse('place on-top-of the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_TOPOF'])
+        self.assertEqual(
+            self.parser.parse('place near the box')[0],
+            RC_PLACE['PL_' + rc_key_short + '_NEAR'])
 
 
 class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
@@ -702,6 +998,12 @@ class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('move ' + side_req + ' right')[0],
             RC_MOVEABS[rc_key_short + '_RIGHT'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' forward')[0],
+            RC_MOVEABS[rc_key_short + '_FORWARD'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' backwards')[0],
+            RC_MOVEABS[rc_key_short + '_BACKWARD'])
 
         # moverel
         self.assertEqual(
@@ -711,16 +1013,59 @@ class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
             self.parser.parse('move ' + side_req + ' next-to the box')[0],
             RC_MOVEREL[rc_key_short + '_NEXTTO'])
 
-        # pickup, place
+        self.assertEqual(
+            self.parser.parse(
+                'move ' + side_req + ' to-the-left-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_LEFTOF'])
+        self.assertEqual(
+            self.parser.parse(
+                'move ' + side_req + ' to-the-right-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_RIGHTOF'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' in-front-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_FRONTOF'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' behind the box')[0],
+            RC_MOVEREL[rc_key_short + '_BEHIND'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' on-top-of the box')[0],
+            RC_MOVEREL[rc_key_short + '_TOPOF'])
+        self.assertEqual(
+            self.parser.parse('move ' + side_req + ' near the box')[0],
+            RC_MOVEREL[rc_key_short + '_NEAR'])
+
+        # pickup
         self.assertEqual(
             self.parser.parse('pick-up with ' + side_req)[0],
             RC_PICKUP[rc_key_short])
+
+        # place
         self.assertEqual(
             self.parser.parse('place above the box with ' + side_req)[0],
             RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
         self.assertEqual(
             self.parser.parse('place next-to the box with ' + side_req)[0],
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
+        self.assertEqual(
+            self.parser.parse(
+                'place to-the-left-of the box with ' + side_req)[0],
+            RC_PLACE['PL_' + rc_key_short + '_LEFTOF'])
+        self.assertEqual(
+            self.parser.parse(
+                'place to-the-right-of the box with ' + side_req)[0],
+            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF'])
+        self.assertEqual(
+            self.parser.parse('place in-front-of the box with ' + side_req)[0],
+            RC_PLACE['PL_' + rc_key_short + '_FRONTOF'])
+        self.assertEqual(
+            self.parser.parse('place behind the box with ' + side_req)[0],
+            RC_PLACE['PL_' + rc_key_short + '_BEHIND'])
+        self.assertEqual(
+            self.parser.parse('place on-top-of the box with ' + side_req)[0],
+            RC_PLACE['PL_' + rc_key_short + '_TOPOF'])
+        self.assertEqual(
+            self.parser.parse('place near the box with ' + side_req)[0],
+            RC_PLACE['PL_' + rc_key_short + '_NEAR'])
 
 
 class FullMultiObjectsSimple(unittest.TestCase):
@@ -769,6 +1114,26 @@ class FullMultiObjectsSimple(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('move ' + hand_str + ' next-to the ' + desc)[0],
             RC_MOVEREL[rc_key_short + '_NEXTTO' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'move ' + hand_str + ' to-the-left-of the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_LEFTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'move ' + hand_str + ' to-the-right-of the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_RIGHTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse('move ' + hand_str + ' in-front-of the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_FRONTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse('move ' + hand_str + ' behind the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_BEHIND' + objkey])
+        self.assertEqual(
+            self.parser.parse('move ' + hand_str + ' on-top-of the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_TOPOF' + objkey])
+        self.assertEqual(
+            self.parser.parse('move ' + hand_str + ' near the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_NEAR' + objkey])
 
         # pickup
         self.assertEqual(
@@ -784,6 +1149,30 @@ class FullMultiObjectsSimple(unittest.TestCase):
             self.parser.parse(
                 'place next-to the ' + desc + ' with ' + hand_str)[0],
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place to-the-left-of the ' + desc + ' with ' + hand_str)[0],
+            RC_PLACE['PL_' + rc_key_short + '_LEFTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place to-the-right-of the ' + desc + ' with ' + hand_str)[0],
+            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place in-front-of the ' + desc + ' with ' + hand_str)[0],
+            RC_PLACE['PL_' + rc_key_short + '_FRONTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place behind the ' + desc + ' with ' + hand_str)[0],
+            RC_PLACE['PL_' + rc_key_short + '_BEHIND' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place on-top-of the ' + desc + ' with ' + hand_str)[0],
+            RC_PLACE['PL_' + rc_key_short + '_TOPOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place near the ' + desc + ' with ' + hand_str)[0],
+            RC_PLACE['PL_' + rc_key_short + '_NEAR' + objkey])
 
 
 class FullMultiObjectsPickHand(unittest.TestCase):
@@ -837,6 +1226,26 @@ class FullMultiObjectsPickHand(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('move next-to the ' + desc)[0],
             RC_MOVEREL[rc_key_short + '_NEXTTO' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'move to-the-left-of the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_LEFTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'move to-the-right-of the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_RIGHTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse('move in-front-of the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_FRONTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse('move behind the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_BEHIND' + objkey])
+        self.assertEqual(
+            self.parser.parse('move on-top-of the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_TOPOF' + objkey])
+        self.assertEqual(
+            self.parser.parse('move near the ' + desc)[0],
+            RC_MOVEREL[rc_key_short + '_NEAR' + objkey])
 
         # pickup
         self.assertEqual(
@@ -850,9 +1259,33 @@ class FullMultiObjectsPickHand(unittest.TestCase):
         self.assertEqual(
             self.parser.parse('place next-to the ' + desc)[0],
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place to-the-left-of the ' + desc)[0],
+            RC_PLACE['PL_' + rc_key_short + '_LEFTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place to-the-right-of the ' + desc)[0],
+            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place in-front-of the ' + desc)[0],
+            RC_PLACE['PL_' + rc_key_short + '_FRONTOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place behind the ' + desc)[0],
+            RC_PLACE['PL_' + rc_key_short + '_BEHIND' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place on-top-of the ' + desc)[0],
+            RC_PLACE['PL_' + rc_key_short + '_TOPOF' + objkey])
+        self.assertEqual(
+            self.parser.parse(
+                'place near the ' + desc)[0],
+            RC_PLACE['PL_' + rc_key_short + '_NEAR' + objkey])
 
 
-class FullImpossibleRobotCommands:
+class FullImpossibleRobotCommands(unittest.TestCase):
     '''
     Cases where you ask it to move in some way and neither hand can. The
     idea is the language should be 'so heavily weighted' that either the
@@ -901,7 +1334,7 @@ class FullImpossibleRobotCommands:
                 S_MOVEABS[cmd])[0], RC_MOVEABS[cmd])
 
 
-class FullImpossibleObjCommands:
+class FullImpossibleObjCommands(unittest.TestCase):
     '''
     Cases where you ask it to pick up an object and neither hand can.
     The idea is the language should be 'so heavily weighted' that either
@@ -938,7 +1371,7 @@ class FullImpossibleObjCommands:
 #       to have the weights such that impossible AND unpreferred
 #       commands are still returned if the person said them. This
 #       reduces the inference to essentially filling in the gaps.
-# class FullImpossibleUnpreferredCommands
+# class FullImpossibleUnpreferredCommands(unittest.TestCase):
 
 
 # ######################################################################

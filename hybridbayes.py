@@ -76,6 +76,12 @@ S = sides_map
 M_OP = {
     'above': 'is_above_reachable',
     'next_to': 'is_nextto_reachable',
+    'to_left_of': 'is_leftof_reachable',
+    'to_right_of': 'is_rightof_reachable',
+    'in_front_of': 'is_frontof_reachable',
+    'behind': 'is_behind_reachable',
+    'on_top_of': 'is_topof_reachable',
+    'near': 'is_near_reachable',
 }
 
 # Map (M) from component options to robot properties (RP).
@@ -1799,6 +1805,50 @@ def play(parser):
     Args:
         parser (Parser): Just initialized to the grammar, un-query'd.
     '''
+    o_full_reachable = {
+        'name': 'obj0',
+        # Relation to arms.
+        'is_pickupable': [True, True],
+        'is_above_reachable': [True, True],
+        'is_nextto_reachable': [True, True],
+        'is_leftof_reachable': [True, True],
+        'is_rightof_reachable': [True, True],
+        'is_frontof_reachable': [True, True],
+        'is_behind_reachable': [True, True],
+        'is_topof_reachable': [True, True],
+        'is_near_reachable': [True, True],
+        # Relation to other objects. These should be more general.
+        'is_leftmost': False,
+        'is_rightmost': False,
+        'is_biggest': False,
+        'is_smallest': False,
+        # E.g. red, blue, green, unknown
+        'color': 'red',
+        # E.g. cup, box, unknown
+        'type': 'box',
+    }
+    o_full_reachable_second = {
+        'name': 'obj1',
+        # Relation to arms.
+        'is_pickupable': [True, True],
+        'is_above_reachable': [True, True],
+        'is_nextto_reachable': [True, True],
+        'is_leftof_reachable': [True, True],
+        'is_rightof_reachable': [True, True],
+        'is_frontof_reachable': [True, True],
+        'is_behind_reachable': [True, True],
+        'is_topof_reachable': [True, True],
+        'is_near_reachable': [True, True],
+        # Relation to other objects. These should be more general.
+        'is_leftmost': False,
+        'is_rightmost': False,
+        'is_biggest': False,
+        'is_smallest': False,
+        # E.g. red, blue, green, unknown
+        'color': 'blue',
+        # E.g. cup, box, unknown
+        'type': 'cup',
+    }
     o_right_possible = {
         'name': 'obj0',
         # Relation to arms.
@@ -1830,8 +1880,10 @@ def play(parser):
         'type': 'box',
     }
     objs = [
-        WorldObject(o_right_possible),
-        WorldObject(o_left_possible_second),
+        WorldObject(o_full_reachable),
+        WorldObject(o_full_reachable_second),
+        # WorldObject(o_right_possible),
+        # WorldObject(o_left_possible_second),
     ]
 
     parser.set_world(world_objects=objs)

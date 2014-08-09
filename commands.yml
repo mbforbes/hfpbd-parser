@@ -60,6 +60,12 @@ parameters:
     rel_pos:
         - above
         - next_to
+        - to_left_of
+        - to_right_of
+        - in_front_of
+        - behind
+        - on_top_of
+        - near
     abs_dir:
         - up
         - down
@@ -160,12 +166,34 @@ options:
             - switch-to
         strategy: verb
 # params
+# rel_pos
     above:
         phrases:
             - above
     next_to:
         phrases:
             - next-to
+    to_left_of:
+        phrases:
+            - to-the-left-of
+    to_right_of:
+        phrases:
+            - to-the-right-of
+    in_front_of:
+        phrases:
+            - in-front-of
+    behind:
+        phrases:
+            - behind
+    on_top_of:
+        phrases:
+            # on gets interpreted as bool (?), so we wrap in quotes
+            - 'on'
+            - on-top-of
+    near:
+        phrases:
+            - near
+# abs_dir
     up:
         phrases:
             - up
@@ -192,6 +220,8 @@ options:
     backward:
         phrases:
             - backwards
+            - closer
+# side
     right_hand:
         phrases:
             - right-hand
