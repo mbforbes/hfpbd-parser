@@ -861,7 +861,6 @@ class FullRobotOneSidePossible(unittest.TestCase):
             RC_MOVEABS[rc_key_short + '_BACKWARD'])
 
 
-
 class FullObjectOneSidePossible(unittest.TestCase):
     def setUp(self):
         Info.printing = False
@@ -1123,13 +1122,15 @@ class FullMultiObjectsSimple(unittest.TestCase):
                 'move ' + hand_str + ' to-the-right-of the ' + desc)[0],
             RC_MOVEREL[rc_key_short + '_RIGHTOF' + objkey])
         self.assertEqual(
-            self.parser.parse('move ' + hand_str + ' in-front-of the ' + desc)[0],
+            self.parser.parse(
+                'move ' + hand_str + ' in-front-of the ' + desc)[0],
             RC_MOVEREL[rc_key_short + '_FRONTOF' + objkey])
         self.assertEqual(
             self.parser.parse('move ' + hand_str + ' behind the ' + desc)[0],
             RC_MOVEREL[rc_key_short + '_BEHIND' + objkey])
         self.assertEqual(
-            self.parser.parse('move ' + hand_str + ' on-top-of the ' + desc)[0],
+            self.parser.parse(
+                'move ' + hand_str + ' on-top-of the ' + desc)[0],
             RC_MOVEREL[rc_key_short + '_TOPOF' + objkey])
         self.assertEqual(
             self.parser.parse('move ' + hand_str + ' near the ' + desc)[0],
