@@ -72,7 +72,10 @@ for idx, side_name in enumerate(SIDES):
     sides_map[side_name] = idx
 S = sides_map
 
+# Object constants
+# ---------------
 # Map (M) from component options to object properties (OP).
+# The type of values for these, when set, are bool[]s.
 M_OP = {
     'above': 'is_above_reachable',
     'next_to': 'is_nextto_reachable',
@@ -84,17 +87,25 @@ M_OP = {
     'near': 'is_near_reachable',
 }
 
-# Map (M) from component options to robot properties (RP).
-M_RP = {
-    'up': 'can_move_up',
-    'down': 'can_move_down',
-    'to_left': 'can_move_toleft',
-    'to_right': 'can_move_toright',
-    'forward': 'can_move_forward',
-    'backward': 'can_move_backward',
-}
+# These, like those in M_OP, are bool[]s, but these don't require
+# translating from component options to object properties because they
+# are always accessed directly by object property name.
+OP_BOOLARRS = [
+    'is_pickupable'
+]
 
-# Map (M) from object properties to WordOption names (WO)
+
+# Object properties that are referred to by the same name in ROS objects
+# as well as the parser.
+# The tope of the values for these, when set, are strs.
+OP_STRS = [
+    'name',
+    'color',
+    'type'
+]
+
+# Map (M) from object properties to WordOption names (WO).
+# The type of the values for these, when set, are bools.
 M_WO = {
     # Location
     'is_leftmost': 'left_most',
@@ -106,6 +117,19 @@ M_WO = {
     'is_smallest': 'smallest',
 }
 M_WO_INVERSE = {v: k for k, v in M_WO.iteritems()}
+
+# Robot constants
+# ----------------
+# Map (M) from component options to robot properties (RP).
+M_RP = {
+    'up': 'can_move_up',
+    'down': 'can_move_down',
+    'to_left': 'can_move_toleft',
+    'to_right': 'can_move_toright',
+    'forward': 'can_move_forward',
+    'backward': 'can_move_backward',
+}
+
 
 # Command score
 START_SCORE = 1.0  # To begin with. Maybe doesn't matter.
@@ -1004,7 +1028,61 @@ class Phrase(object):
         return self.words
 
 
-class WorldObject(object):
+class PropertyGetter(object):
+    '''
+    A safe (ish) interface for a dictionary.
+
+    Basically allows checking / gettting properties through an API
+    rather than directly.
+    '''
+
+    def __init__(self, properties=None):
+        '''
+        Args:
+            properties ({str: object}, optional): Mapping of names to
+                properties, which are usually strings, bools, or
+                two-element bool lists (for right, left hands). This
+                will likely come from a yaml-loaded dictionary in
+                basic testing, a programatiicaly-created dictionary in
+                programtic testing, and the real robot (via a ROS
+                message) in real-robot testing.
+        '''
+        if properties is None:
+            properties = {}
+        self.properties = properties
+
+    def has_property(self, name):
+        '''
+        Returns whether world object has a property.
+
+        This is really mostly useful for testing, where we might omit
+        some world object state.
+
+        Returns:
+            bool
+        '''
+        return name in self.properties
+
+    def get_property(self, name):
+        '''
+        Gets a world object's property by name.
+
+        Returns:
+            object
+        '''
+        return self.properties[name]
+
+    def to_dict_str(self):
+        '''
+        For display (e.g. in web interface).
+
+        Returns:
+            str
+        '''
+        return yaml.dump(self.properties)
+
+
+class WorldObject(PropertyGetter):
     '''
     Contains data about the properties of an object in the world.
 
@@ -1014,15 +1092,6 @@ class WorldObject(object):
     # Properties that must match for objects to be considered matching
     # (for the purposes of sentence generation).
     matching_properties = ['name', 'color', 'type']
-
-    def __init__(self, properties=None):
-        '''
-        Use from_dicts if calling from yaml-loaded list of property
-        dictionaries.
-        '''
-        if properties is None:
-            properties = {}
-        self.properties = properties
 
     def __repr__(self):
         '''
@@ -1072,56 +1141,34 @@ class WorldObject(object):
             # our internal representation. The accessors we provide
             # check for property existence, so this is the correct way
             # (rather than copying dummy values).
+            props = {}
 
-            # The following are always set (or their default values are
-            # such that we can't check).
-            obj = {
-                'name': rwo.name,
-                'is_leftmost': rwo.is_leftmost,
-                'is_rightmost': rwo.is_rightmost,
-                'is_farthest': rwo.is_farthest,
-                'is_nearest': rwo.is_nearest,
-                'is_biggest': rwo.is_biggest,
-                'is_smallest': rwo.is_smallest,
-            }
+            # Strings are probably set, but we can check.
+            for op_str in OP_STRS:
+                rwo_val = getattr(rwo, op_str)
+                if len(rwo_val) > 0:
+                    props[op_str] = rwo_val
 
-            # The following may or may not be set.
-            if len(rwo.color) > 0:
-                obj['color'] = rwo.color
-            if len(rwo.type) > 0:
-                obj['type'] = rwo.type
+            # Bools are always set, so we can't check.
+            for rostype, parsertype in M_WO.iteritems():
+                # Our world objects keep the ros type keys.
+                props[rostype] = getattr(rwo, rostype)
 
-            # The following may or may not be set, and they are arrays.
-            if len(rwo.is_pickupable) == 2:
-                obj['is_pickupable'] = rwo.is_pickupable
-            if len(rwo.is_above_reachable) == 2:
-                obj['is_above_reachable'] = rwo.is_above_reachable
-            if len(rwo.is_nextto_reachable) == 2:
-                obj['is_nextto_reachable'] = rwo.is_nextto_reachable
+
+            # Bool[] we can check.
+            for parsertype, rostype in M_OP.iteritems():
+                rwo_val = getattr(rwo, rostype)
+                if len(rwo_val) == 2:
+                    props[rostype] = rwo_val
+
+            # These are bool[]s that don't require translation.
+            for op_boolarr in OP_BOOLARRS:
+                rwo_val = getattr(rwo, op_boolarr)
+                if len(rwo_val) == 2:
+                    props[op_boolarr] = rwo_val
 
             wobjs += [WorldObject(obj)]
         return wobjs
-
-    def has_property(self, name):
-        '''
-        Returns whether world object has a property.
-
-        This is really mostly useful for testing, where we might omit
-        some world object state.
-
-        Returns:
-            bool
-        '''
-        return name in self.properties
-
-    def get_property(self, name):
-        '''
-        Gets a world object's property by name.
-
-        Returns:
-            object
-        '''
-        return self.properties[name]
 
     def matches_for_generation(self, other):
         '''
@@ -1156,25 +1203,10 @@ class WorldObject(object):
             self.get_property(prop) == other.get_property(prop))
 
 
-class Robot(object):
+class Robot(PropertyGetter):
     '''
     Provides an interface for accessing robot data.
     '''
-
-    def __init__(self, properties=None):
-        '''
-        Args:
-            properties ({str: object}, optional): Mapping of names to
-                properties, which are usually strings, bools, or
-                two-element bool lists (for right, left hands). This
-                will likely come from a yaml-loaded dictionary in
-                basic testing, a programatiicaly-created dictionary in
-                programtic testing, and the real robot (via a ROS
-                message) in real-robot testing.
-        '''
-        if properties is None:
-            properties = {}
-        self.properties = properties
 
     @staticmethod
     def from_ros(robot_state):
@@ -1218,27 +1250,6 @@ class Robot(object):
             props['can_move_backward'] = robot_state.can_move_backward
 
         return Robot(props)
-
-    def has_property(self, name):
-        '''
-        Returns whether robot has a property.
-
-        This is really mostly useful for testing, where we might omit
-        the robot state.
-
-        Returns:
-            bool
-        '''
-        return name in self.properties
-
-    def get_property(self, name):
-        '''
-        Gets a robot's property by name.
-
-        Returns:
-            object
-        '''
-        return self.properties[name]
 
 
 class RobotCommand(object):
@@ -1360,6 +1371,31 @@ class Parser(object):
         '''
         return Logger.get_buffer()
 
+    def get_world_objects_str(self):
+        '''
+        For display (e.g. web interface).
+
+        Returns:
+            str
+        '''
+        ret = ''
+        if self.world_objects is not None:
+            for obj in self.world_objects:
+                ret += obj.to_dict_str()
+        return ret
+
+    def get_robot_str(self):
+        '''
+        For display (e.g. web interface).
+
+        Returns:
+            str
+        '''
+        ret = ''
+        if self.robot is not None:
+            ret = self.robot.to_dict_str()
+        return ret
+
     def simple_interactive_loop(self):
         '''
         Answers queries using no world objects and no robot state.
@@ -1447,13 +1483,17 @@ class Parser(object):
             objs += [obj]
         return objs
 
-    def startup_ros(self):
+    def startup_ros(self, spin=True):
         '''ROS-specific: Sets up callbacks for
             - recognized speech from pocketsphinx
             - world state updates
             - robot state updates
         and publishers for
             - HandsFreeCommand
+
+        Returns:
+            bool: Whether the setup succeeded. Note that this won't
+            return until ros has shutdown if spin (== True)!
         '''
         # Some settings
         Debug.printing = False
@@ -1469,6 +1509,8 @@ class Parser(object):
             from std_msgs.msg import String
             from pr2_pbd_interaction.msg import (
                 HandsFreeCommand, WorldObjects, RobotState)
+            # TODO(mbforbes); This waits for ROS. This is annoying, but
+            # actually may be OK for now.
             rospy.init_node('hfpbd_parser')
 
             # We get: speech, world objects, robot state.
@@ -1482,12 +1524,16 @@ class Parser(object):
             self.hfcmd_pub = rospy.Publisher(
                 'handsfree_command', HandsFreeCommand)
 
-            # Don't die!
+            # Setup complete
             self.ros_running = True
-            rospy.spin()
+
+            # If no other frontend, just wait here.
+            if spin:
+                rospy.spin()
+            return True
         except ImportError:
-            # We don't have ROS installed or running! That's OK.
-            pass
+            # We don't have ROS installed! That's OK.
+            return False
 
     def sphinx_cb(self, recognized):
         '''ROS-specific: Callback for when data received from
@@ -1632,7 +1678,7 @@ class Parser(object):
 
         # Maybe publish to ROS!
         if self.ros_running and self.hfcmd_pub is not None:
-            self.hfcmd_pub.publish(robotCommand.to_rosmsg())
+            self.hfcmd_pub.publish(rc.to_rosmsg())
 
         # Give back to caller
         return ret

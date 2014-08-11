@@ -27,15 +27,14 @@ app = Flask(__name__)
 
 # Make parser stuff
 parser = Parser(buffer_printing=True)
-parser.startup_ros()
+if not parser.startup_ros(spin=False):
+    parser.set_default_world()
 
 # Get vars to display
 print 'loading'
 world = yaml.load(open('world.yml'))
 objs = world['objects']
 robot = world['robot']
-objs_str = yaml.dump(objs)
-robot_str = yaml.dump(robot)
 
 
 @app.route('/style.css')
@@ -46,6 +45,9 @@ def style():
 @app.route('/', methods=['GET', 'POST'])
 def parse():
     try:
+        objs_str = parser.get_world_objects_str()
+        robot_str = parser.get_robot_str()
+
         if request.method == 'POST':
             # TODO process
             data = request.form['inputtext']
@@ -68,5 +70,4 @@ def parse():
         print traceback.format_exc()
 
 if __name__ == '__main__':
-    print sys.argv
     app.run(debug=True)
