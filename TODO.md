@@ -1,3 +1,7 @@
+- [HIGH] Clarifying should check whether ALL top commands match the same
+template, anod only clarify arguments if so. Otherwise, it needs to
+clarify the command.
+
 - [HIGH] More scoring hints:
 	- Add action info to robot state.
 	- Switch, execute unlikely when no actions

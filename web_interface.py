@@ -9,6 +9,7 @@ __author__ = 'mbforbes'
 
 # Builtins
 import os
+import sys
 import traceback
 import yaml
 
@@ -67,4 +68,5 @@ def parse():
         print traceback.format_exc()
 
 if __name__ == '__main__':
+    print sys.argv
     app.run(debug=True)

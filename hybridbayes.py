@@ -1350,6 +1350,8 @@ class Parser(object):
         self.options = None
         self.templates = None
         self.commands = None
+        self.hfcmd_pub = None
+        self.ros_running = False
 
     def get_print_buffer(self):
         '''
@@ -1479,6 +1481,7 @@ class Parser(object):
         self.hfcmd_pub = rospy.Publisher('handsfree_command', HandsFreeCommand)
 
         # Don't die!
+        self.ros_running = True
         rospy.spin()
 
     def sphinx_cb(self, recognized):
@@ -1493,9 +1496,8 @@ class Parser(object):
         if len(recog_str.strip()) == 0:
             return
 
-        # Parse and respond!
+        # Parse; ROS response happens in parser automatically.
         robotCommand, buf_log = self.parse(recog_str)
-        self.hfcmd_pub.publish(robotCommand.to_rosmsg())
 
     def world_objects_cb(self, world_objects):
         '''ROS-specific: Callback for when world objects are received
@@ -1622,6 +1624,12 @@ class Parser(object):
         )
 
         self.lock.release()
+
+        # Maybe publish to ROS!
+        if self.ros_running and self.hfcmd_pub is not None:
+            self.hfcmd_pub.publish(robotCommand.to_rosmsg())
+
+        # Give back to caller
         return ret
 
     def _log_results(self, rc):
