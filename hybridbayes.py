@@ -1154,7 +1154,6 @@ class WorldObject(PropertyGetter):
                 # Our world objects keep the ros type keys.
                 props[rostype] = getattr(rwo, rostype)
 
-
             # Bool[] we can check.
             for parsertype, rostype in M_OP.iteritems():
                 rwo_val = getattr(rwo, rostype)
