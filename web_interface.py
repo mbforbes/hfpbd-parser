@@ -27,7 +27,7 @@ app = Flask(__name__)
 
 # Make parser stuff
 parser = Parser(buffer_printing=True)
-parser.set_default_world()
+parser.startup_ros()
 
 # Get vars to display
 print 'loading'

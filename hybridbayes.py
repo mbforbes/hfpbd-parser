@@ -1462,27 +1462,32 @@ class Parser(object):
         self.set_world()
 
         # Setup ROS.
-        import roslib
-        roslib.load_manifest('pr2_pbd_interaction')
-        import rospy
-        from std_msgs.msg import String
-        from pr2_pbd_interaction.msg import (
-            HandsFreeCommand, WorldObjects, RobotState)
-        rospy.init_node('hfpbd_parser')
+        try:
+            import roslib
+            roslib.load_manifest('pr2_pbd_interaction')
+            import rospy
+            from std_msgs.msg import String
+            from pr2_pbd_interaction.msg import (
+                HandsFreeCommand, WorldObjects, RobotState)
+            rospy.init_node('hfpbd_parser')
 
-        # We get: speech, world objects, robot state.
-        rospy.Subscriber('recognizer/output', String, self.sphinx_cb)
-        rospy.Subscriber(
-            'handsfree_worldobjects', WorldObjects, self.world_objects_cb)
-        rospy.Subscriber(
-            'handsfree_robotstate', RobotState, self.robot_state_cb)
+            # We get: speech, world objects, robot state.
+            rospy.Subscriber('recognizer/output', String, self.sphinx_cb)
+            rospy.Subscriber(
+                'handsfree_worldobjects', WorldObjects, self.world_objects_cb)
+            rospy.Subscriber(
+                'handsfree_robotstate', RobotState, self.robot_state_cb)
 
-        # We send: parsed commands.
-        self.hfcmd_pub = rospy.Publisher('handsfree_command', HandsFreeCommand)
+            # We send: parsed commands.
+            self.hfcmd_pub = rospy.Publisher(
+                'handsfree_command', HandsFreeCommand)
 
-        # Don't die!
-        self.ros_running = True
-        rospy.spin()
+            # Don't die!
+            self.ros_running = True
+            rospy.spin()
+        except ImportError:
+            # We don't have ROS installed or running! That's OK.
+            pass
 
     def sphinx_cb(self, recognized):
         '''ROS-specific: Callback for when data received from
