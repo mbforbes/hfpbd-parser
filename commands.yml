@@ -34,7 +34,8 @@ commands:
     stop:
         - stop
     create_new_action:
-        - create_new_action
+        - create_new
+        - action
     switch_action:
         - switch_to
         - which
@@ -157,9 +158,9 @@ options:
         phrases:
             - stop
         strategy: verb
-    create_new_action:
+    create_new:
         phrases:
-            - create-new-action
+            - create-new
         strategy: verb
     switch_to:
         phrases:

@@ -1,3 +1,8 @@
+- [HIGH] More scoring hints:
+	- Add action info to robot state.
+	- Switch, execute unlikely when no actions
+	- Stop already unlikely when not executing, right?
+
 - [MEDIUM] Add tests for admin commands (easy but important)
 
 - [MEDIUM] Implement rest of commands

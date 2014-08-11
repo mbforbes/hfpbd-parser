@@ -1329,7 +1329,7 @@ class RobotCommand(object):
 class Parser(object):
 
     # Couple settings (currently for debugging)
-    display_limit = 30
+    display_limit = 3
 
     def __init__(self, grammar_yaml=COMMAND_GRAMMAR, buffer_printing=False):
         # If set, logger saves ouput
@@ -1453,6 +1453,9 @@ class Parser(object):
         and publishers for
             - HandsFreeCommand
         '''
+        # Some settings
+        Debug.printing = False
+
         # Setup default system.
         self.set_world()
 
@@ -1612,7 +1615,7 @@ class Parser(object):
 
         # We return a new representation of the command as well as some
         # logging buffers (perhaps) for display.
-        self._log_results()
+        self._log_results(rc)
         ret = (
             rc,
             '\n'.join([self.start_buffer, self.get_print_buffer()])
@@ -1621,9 +1624,12 @@ class Parser(object):
         self.lock.release()
         return ret
 
-    def _log_results(self):
+    def _log_results(self, rc):
         '''
         Write results of parse to log.
+
+        Args:
+            rc (RobotCommand): What we're returning.
         '''
         if Info.printing:
             # Display sentences.
@@ -1638,6 +1644,9 @@ class Parser(object):
             for idx, c in enumerate(self.commands):
                 if idx < Parser.display_limit:
                     Info.pl(1, c)
+
+            # For clarity, show what we're returning.
+            Info.p('Returning command: %s' % (str(rc)))
 
     def set_default_world(self):
         '''
@@ -1676,15 +1685,19 @@ class Parser(object):
         # First, see whether we need to do this at all.
         if Parser._check_objects_match(
                 self.world_objects, self.world_objects_for_generation):
-            Info.p("Objects match; not re-generating.")
+            Debug.p("Objects match; not re-generating.")
             return
         else:
-            Info.p("Objects do not match; re-generating.")
+            Debug.p("Objects do not match; re-generating.")
 
         # Make templates (this extracts options and params).
         self.world_objects_for_generation = self.world_objects
         self.phrases, self.options, self.templates = (
             self.command_dict.get_grammar(self.world_objects))
+
+        # Some initial displaying
+        Info.p("Phrases: " + str(len(self.phrases)))
+        Info.p("Options: " + str(len(self.options)))
         Debug.p('Templates:')
         for t in self.templates:
             Debug.pl(1, t)
@@ -1779,17 +1792,19 @@ class Parser(object):
         Numbers.normalize(self.commands, min_score=MIN_SCORE)
 
         # Display commands.
-        self.commands.sort(key=attrgetter('score'), reverse=True)
-        Info.p("Top commands (before utterance):")
-        for idx, c in enumerate(self.commands):
-            if idx < Parser.display_limit:
-                Info.pl(1, c)
-        Info.p(
-            'Total (%d): %0.2f' % (
-                len(self.commands),
-                sum([c.score for c in self.commands])
+        if Debug.printing:
+            self.commands.sort(key=attrgetter('score'), reverse=True)
+            Debug.p(
+                "Top %d commands (before utterance):" % (Parser.display_limit))
+            for idx, c in enumerate(self.commands):
+                if idx < Parser.display_limit:
+                    Debug.pl(1, c)
+            Debug.p(
+                'Total (%d): %0.2f' % (
+                    len(self.commands),
+                    sum([c.score for c in self.commands])
+                )
             )
-        )
 
 
 ########################################################################
