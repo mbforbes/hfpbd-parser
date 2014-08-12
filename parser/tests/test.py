@@ -37,8 +37,10 @@ import getpass
 import unittest
 
 # Local
-from hybridbayes import Parser, WorldObject, Robot, RobotCommand, Info, Debug
-from matchers import DefaultMatcher
+from parser.core.frontends import Frontend
+from parser.core.roslink import WorldObject, Robot, RobotCommand
+from parser.core.util import Info, Debug
+from parser.core.matchers import DefaultMatcher
 
 
 # ######################################################################
@@ -517,25 +519,25 @@ class FullNoContext(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
-        self.parser.set_world()
+        self.frontend = Frontend()
+        self.frontend.set_world()
 
     def test_openclose(self):
         for cmd in S_OPEN_CLOSE.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_OPEN_CLOSE[cmd])[0], RC_OPEN_CLOSE[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_OPEN_CLOSE[cmd]), RC_OPEN_CLOSE[cmd])
 
     def test_moveabs(self):
         for cmd in S_MOVEABS.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_MOVEABS[cmd])[0], RC_MOVEABS[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_MOVEABS[cmd]), RC_MOVEABS[cmd])
 
 
 class FullInferOpenClose(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
 
     def test_pick_open(self):
         # We're going to weight against the last commanded side.
@@ -543,9 +545,9 @@ class FullInferOpenClose(unittest.TestCase):
             'gripper_states': ['closed_empty', 'open'],
             'last_cmd_side': 'left_hand',
         })
-        self.parser.set_world(robot=robot)
+        self.frontend.set_world(robot=robot)
         self.assertEqual(
-            self.parser.parse('open')[0],
+            self.frontend.parse('open'),
             RC_OPEN_CLOSE['OPENRIGHT']
         )
 
@@ -554,9 +556,9 @@ class FullInferOpenClose(unittest.TestCase):
             'gripper_states': ['open', 'has_obj'],
             'last_cmd_side': 'right_hand',
         })
-        self.parser.set_world(robot=robot)
+        self.frontend.set_world(robot=robot)
         self.assertEqual(
-            self.parser.parse('release')[0],
+            self.frontend.parse('release'),
             RC_OPEN_CLOSE['OPENLEFT']
         )
 
@@ -566,9 +568,9 @@ class FullInferOpenClose(unittest.TestCase):
             'gripper_states': ['closed_empty', 'open'],
             'last_cmd_side': 'right_hand',
         })
-        self.parser.set_world(robot=robot)
+        self.frontend.set_world(robot=robot)
         self.assertEqual(
-            self.parser.parse('close')[0],
+            self.frontend.parse('close'),
             RC_OPEN_CLOSE['CLOSELEFT']
         )
 
@@ -577,9 +579,9 @@ class FullInferOpenClose(unittest.TestCase):
             'gripper_states': ['open', 'has_obj'],
             'last_cmd_side': 'left_hand',
         })
-        self.parser.set_world(robot=robot)
+        self.frontend.set_world(robot=robot)
         self.assertEqual(
-            self.parser.parse('close')[0],
+            self.frontend.parse('close'),
             RC_OPEN_CLOSE['CLOSERIGHT']
         )
 
@@ -588,72 +590,72 @@ class FullOneObjNoRobot(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
         objs = [WorldObject(O_FULL_REACHABLE)]
-        self.parser.set_world(world_objects=objs)
+        self.frontend.set_world(world_objects=objs)
 
     def test_openclose(self):
         for cmd in S_OPEN_CLOSE.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_OPEN_CLOSE[cmd])[0], RC_OPEN_CLOSE[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_OPEN_CLOSE[cmd]), RC_OPEN_CLOSE[cmd])
 
     def test_moveabs(self):
         for cmd in S_MOVEABS.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_MOVEABS[cmd])[0], RC_MOVEABS[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_MOVEABS[cmd]), RC_MOVEABS[cmd])
 
     def test_moverel(self):
         for cmd in S_MOVEREL.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_MOVEREL[cmd])[0], RC_MOVEREL[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_MOVEREL[cmd]), RC_MOVEREL[cmd])
 
     def test_pickup(self):
         for cmd in S_PICKUP.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_PICKUP[cmd])[0], RC_PICKUP[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_PICKUP[cmd]), RC_PICKUP[cmd])
 
     def test_place(self):
         for cmd in S_PLACE.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_PLACE[cmd])[0], RC_PLACE[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_PLACE[cmd]), RC_PLACE[cmd])
 
     def test_lookat(self):
         for cmd in S_LOOKAT.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_LOOKAT[cmd])[0], RC_LOOKAT[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_LOOKAT[cmd]), RC_LOOKAT[cmd])
 
     def test_synonyms(self):
         self.assertEqual(
-            self.parser.parse('open left-gripper')[0],
+            self.frontend.parse('open left-gripper'),
             RC_OPEN_CLOSE['OPENLEFT'])
         self.assertEqual(
-            self.parser.parse('close right-gripper')[0],
+            self.frontend.parse('close right-gripper'),
             RC_OPEN_CLOSE['CLOSERIGHT'])
         self.assertEqual(
-            self.parser.parse('move left-arm higher')[0],
+            self.frontend.parse('move left-arm higher'),
             RC_MOVEABS['LH_UP'])
         self.assertEqual(
-            self.parser.parse('move right-gripper to-the-left')[0],
+            self.frontend.parse('move right-gripper to-the-left'),
             RC_MOVEABS['RH_LEFT'])
         self.assertEqual(
-            self.parser.parse('move right-gripper away')[0],
+            self.frontend.parse('move right-gripper away'),
             RC_MOVEABS['RH_FORWARD'])
         self.assertEqual(
-            self.parser.parse('move left-gripper closer')[0],
+            self.frontend.parse('move left-gripper closer'),
             RC_MOVEABS['LH_BACKWARD'])
         self.assertEqual(
-            self.parser.parse('pick the red block up left-hand')[0],
+            self.frontend.parse('pick the red block up left-hand'),
             RC_PICKUP['LH'])
         self.assertEqual(
-            self.parser.parse('pick the red block up right-arm')[0],
+            self.frontend.parse('pick the red block up right-arm'),
             RC_PICKUP['RH'])
 
     def test_missing_words(self):
         self.assertEqual(
-            self.parser.parse('lower left-gripper')[0],
+            self.frontend.parse('lower left-gripper'),
             RC_MOVEABS['LH_DOWN'])
         self.assertEqual(
-            self.parser.parse('raise right-gripper')[0],
+            self.frontend.parse('raise right-gripper'),
             RC_MOVEABS['RH_UP'])
 
     @unittest.skipIf(
@@ -684,18 +686,18 @@ class FullOneObjNoRobot(unittest.TestCase):
                 for key, cmd in str_items:
                     query = ' '.join([prefix, cmd, postfix])
                     expected_rc = all_rcs[key]
-                    actual_rc = self.parser.parse(query)[0]
+                    actual_rc = self.frontend.parse(query)[0]
                     self.assertEqual(expected_rc, actual_rc)
 
     def test_obj_desc(self):
         self.assertEqual(
-            self.parser.parse('pick-up that thing left-hand')[0],
+            self.frontend.parse('pick-up that thing left-hand'),
             RC_PICKUP['LH'])
         self.assertEqual(
-            self.parser.parse('pick-up the box right-hand')[0],
+            self.frontend.parse('pick-up the box right-hand'),
             RC_PICKUP['RH'])
         self.assertEqual(
-            self.parser.parse('pick-up the red thing right-hand')[0],
+            self.frontend.parse('pick-up the red thing right-hand'),
             RC_PICKUP['RH'])
 
 
@@ -703,20 +705,20 @@ class FullOneObjRobotSidePref(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
         objs = [WorldObject(O_FULL_REACHABLE)]
         # NOTE: Only 'update objects' called; this ensures we must
         # update the robot in each test method before the parser will
         # run (as we want both to be specified). We could call 'set
         # world' instead but this ensures we write the tests correctly.
-        self.parser.update_objects(world_objects=objs)
+        self.frontend.update_objects(world_objects=objs)
 
     def test_right_preferred(self):
-        self.parser.update_robot(Robot(R_RIGHT_PREF))
+        self.frontend.update_robot(Robot(R_RIGHT_PREF))
         self._check_side_preferred('right_hand')
 
     def test_left_preferred(self):
-        self.parser.update_robot(Robot(R_LEFT_PREF))
+        self.frontend.update_robot(Robot(R_LEFT_PREF))
         self._check_side_preferred('left_hand')
 
     def _check_side_preferred(self, side_rc):
@@ -730,86 +732,86 @@ class FullOneObjRobotSidePref(unittest.TestCase):
 
         # open / close
         self.assertEqual(
-            self.parser.parse('open')[0],
+            self.frontend.parse('open'),
             RC_OPEN_CLOSE['OPEN' + rc_key_long])
         self.assertEqual(
-            self.parser.parse('close')[0],
+            self.frontend.parse('close'),
             RC_OPEN_CLOSE['CLOSE' + rc_key_long])
 
         # moveabs
         self.assertEqual(
-            self.parser.parse('move up')[0],
+            self.frontend.parse('move up'),
             RC_MOVEABS[rc_key_short + '_UP'])
         self.assertEqual(
-            self.parser.parse('move down')[0],
+            self.frontend.parse('move down'),
             RC_MOVEABS[rc_key_short + '_DOWN'])
         self.assertEqual(
-            self.parser.parse('move left')[0],
+            self.frontend.parse('move left'),
             RC_MOVEABS[rc_key_short + '_LEFT'])
         self.assertEqual(
-            self.parser.parse('move right')[0],
+            self.frontend.parse('move right'),
             RC_MOVEABS[rc_key_short + '_RIGHT'])
         self.assertEqual(
-            self.parser.parse('move forward')[0],
+            self.frontend.parse('move forward'),
             RC_MOVEABS[rc_key_short + '_FORWARD'])
         self.assertEqual(
-            self.parser.parse('move backwards')[0],
+            self.frontend.parse('move backwards'),
             RC_MOVEABS[rc_key_short + '_BACKWARD'])
 
         # moverel
         self.assertEqual(
-            self.parser.parse('move above the box')[0],
+            self.frontend.parse('move above the box'),
             RC_MOVEREL[rc_key_short + '_ABOVE'])
         self.assertEqual(
-            self.parser.parse('move next-to the box')[0],
+            self.frontend.parse('move next-to the box'),
             RC_MOVEREL[rc_key_short + '_NEXTTO'])
         self.assertEqual(
-            self.parser.parse('move to-the-left-of the box')[0],
+            self.frontend.parse('move to-the-left-of the box'),
             RC_MOVEREL[rc_key_short + '_LEFTOF'])
         self.assertEqual(
-            self.parser.parse('move to-the-right-of the box')[0],
+            self.frontend.parse('move to-the-right-of the box'),
             RC_MOVEREL[rc_key_short + '_RIGHTOF'])
         self.assertEqual(
-            self.parser.parse('move in-front-of the box')[0],
+            self.frontend.parse('move in-front-of the box'),
             RC_MOVEREL[rc_key_short + '_FRONTOF'])
         self.assertEqual(
-            self.parser.parse('move behind the box')[0],
+            self.frontend.parse('move behind the box'),
             RC_MOVEREL[rc_key_short + '_BEHIND'])
         self.assertEqual(
-            self.parser.parse('move on-top-of the box')[0],
+            self.frontend.parse('move on-top-of the box'),
             RC_MOVEREL[rc_key_short + '_TOPOF'])
         self.assertEqual(
-            self.parser.parse('move near the box')[0],
+            self.frontend.parse('move near the box'),
             RC_MOVEREL[rc_key_short + '_NEAR'])
 
         # pickup, place
         self.assertEqual(
-            self.parser.parse('pick-up')[0],
+            self.frontend.parse('pick-up'),
             RC_PICKUP[rc_key_short])
         self.assertEqual(
-            self.parser.parse('place above the box')[0],
+            self.frontend.parse('place above the box'),
             RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
         self.assertEqual(
-            self.parser.parse('place next-to the box')[0],
+            self.frontend.parse('place next-to the box'),
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
 
         self.assertEqual(
-            self.parser.parse('place to-the-left-of the box')[0],
+            self.frontend.parse('place to-the-left-of the box'),
             RC_PLACE['PL_' + rc_key_short + '_LEFTOF'])
         self.assertEqual(
-            self.parser.parse('place to-the-right-of the box')[0],
+            self.frontend.parse('place to-the-right-of the box'),
             RC_PLACE['PL_' + rc_key_short + '_RIGHTOF'])
         self.assertEqual(
-            self.parser.parse('place in-front-of the box')[0],
+            self.frontend.parse('place in-front-of the box'),
             RC_PLACE['PL_' + rc_key_short + '_FRONTOF'])
         self.assertEqual(
-            self.parser.parse('place behind the box')[0],
+            self.frontend.parse('place behind the box'),
             RC_PLACE['PL_' + rc_key_short + '_BEHIND'])
         self.assertEqual(
-            self.parser.parse('place on-top-of the box')[0],
+            self.frontend.parse('place on-top-of the box'),
             RC_PLACE['PL_' + rc_key_short + '_TOPOF'])
         self.assertEqual(
-            self.parser.parse('place near the box')[0],
+            self.frontend.parse('place near the box'),
             RC_PLACE['PL_' + rc_key_short + '_NEAR'])
 
 
@@ -817,18 +819,18 @@ class FullRobotOneSidePossible(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
 
     def test_only_right_possible(self):
         # Trying with no objects; focus is on ROBOT state.
         robot = Robot(R_ONLY_RIGHT_POSSIBLE)
-        self.parser.set_world(robot=robot)
+        self.frontend.set_world(robot=robot)
         self._check_side_possible('right_hand')
 
     def test_only_left_possible(self):
         # Trying with no objects; focus is on ROBOT state.
         robot = Robot(R_ONLY_LEFT_POSSIBLE)
-        self.parser.set_world(robot=robot)
+        self.frontend.set_world(robot=robot)
         self._check_side_possible('left_hand')
 
     def _check_side_possible(self, side_rc):
@@ -842,22 +844,22 @@ class FullRobotOneSidePossible(unittest.TestCase):
 
         # moveabs
         self.assertEqual(
-            self.parser.parse('move up')[0],
+            self.frontend.parse('move up'),
             RC_MOVEABS[rc_key_short + '_UP'])
         self.assertEqual(
-            self.parser.parse('move down')[0],
+            self.frontend.parse('move down'),
             RC_MOVEABS[rc_key_short + '_DOWN'])
         self.assertEqual(
-            self.parser.parse('move left')[0],
+            self.frontend.parse('move left'),
             RC_MOVEABS[rc_key_short + '_LEFT'])
         self.assertEqual(
-            self.parser.parse('move right')[0],
+            self.frontend.parse('move right'),
             RC_MOVEABS[rc_key_short + '_RIGHT'])
         self.assertEqual(
-            self.parser.parse('move forward')[0],
+            self.frontend.parse('move forward'),
             RC_MOVEABS[rc_key_short + '_FORWARD'])
         self.assertEqual(
-            self.parser.parse('move backwards')[0],
+            self.frontend.parse('move backwards'),
             RC_MOVEABS[rc_key_short + '_BACKWARD'])
 
 
@@ -865,16 +867,16 @@ class FullObjectOneSidePossible(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
 
     def test_only_right_possible(self):
         # Trying with no robot; focus is on OBJECT state.
-        self.parser.set_world(world_objects=[WorldObject(O_RIGHT_POSSIBLE)])
+        self.frontend.set_world(world_objects=[WorldObject(O_RIGHT_POSSIBLE)])
         self._check_object_side('right_hand')
 
     def test_only_left_possible(self):
         # Trying with no robot; focus is on OBJECT state.
-        self.parser.set_world(world_objects=[WorldObject(O_LEFT_POSSIBLE)])
+        self.frontend.set_world(world_objects=[WorldObject(O_LEFT_POSSIBLE)])
         self._check_object_side('left_hand')
 
     def _check_object_side(self, side_rc):
@@ -888,59 +890,59 @@ class FullObjectOneSidePossible(unittest.TestCase):
 
         # moverel
         self.assertEqual(
-            self.parser.parse('move above the red box')[0],
+            self.frontend.parse('move above the red box'),
             RC_MOVEREL[rc_key_short + '_ABOVE'])
         self.assertEqual(
-            self.parser.parse('move next-to the red box')[0],
+            self.frontend.parse('move next-to the red box'),
             RC_MOVEREL[rc_key_short + '_NEXTTO'])
         self.assertEqual(
-            self.parser.parse('move to-the-left-of the box')[0],
+            self.frontend.parse('move to-the-left-of the box'),
             RC_MOVEREL[rc_key_short + '_LEFTOF'])
         self.assertEqual(
-            self.parser.parse('move to-the-right-of the box')[0],
+            self.frontend.parse('move to-the-right-of the box'),
             RC_MOVEREL[rc_key_short + '_RIGHTOF'])
         self.assertEqual(
-            self.parser.parse('move in-front-of the box')[0],
+            self.frontend.parse('move in-front-of the box'),
             RC_MOVEREL[rc_key_short + '_FRONTOF'])
         self.assertEqual(
-            self.parser.parse('move behind the box')[0],
+            self.frontend.parse('move behind the box'),
             RC_MOVEREL[rc_key_short + '_BEHIND'])
         self.assertEqual(
-            self.parser.parse('move on-top-of the box')[0],
+            self.frontend.parse('move on-top-of the box'),
             RC_MOVEREL[rc_key_short + '_TOPOF'])
         self.assertEqual(
-            self.parser.parse('move near the box')[0],
+            self.frontend.parse('move near the box'),
             RC_MOVEREL[rc_key_short + '_NEAR'])
 
         # pickup
         self.assertEqual(
-            self.parser.parse('pick-up the red box')[0],
+            self.frontend.parse('pick-up the red box'),
             RC_PICKUP[rc_key_short])
 
         # place
         self.assertEqual(
-            self.parser.parse('place above the red box')[0],
+            self.frontend.parse('place above the red box'),
             RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
         self.assertEqual(
-            self.parser.parse('place next-to the red box')[0],
+            self.frontend.parse('place next-to the red box'),
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
         self.assertEqual(
-            self.parser.parse('place to-the-left-of the box')[0],
+            self.frontend.parse('place to-the-left-of the box'),
             RC_PLACE['PL_' + rc_key_short + '_LEFTOF'])
         self.assertEqual(
-            self.parser.parse('place to-the-right-of the box')[0],
+            self.frontend.parse('place to-the-right-of the box'),
             RC_PLACE['PL_' + rc_key_short + '_RIGHTOF'])
         self.assertEqual(
-            self.parser.parse('place in-front-of the box')[0],
+            self.frontend.parse('place in-front-of the box'),
             RC_PLACE['PL_' + rc_key_short + '_FRONTOF'])
         self.assertEqual(
-            self.parser.parse('place behind the box')[0],
+            self.frontend.parse('place behind the box'),
             RC_PLACE['PL_' + rc_key_short + '_BEHIND'])
         self.assertEqual(
-            self.parser.parse('place on-top-of the box')[0],
+            self.frontend.parse('place on-top-of the box'),
             RC_PLACE['PL_' + rc_key_short + '_TOPOF'])
         self.assertEqual(
-            self.parser.parse('place near the box')[0],
+            self.frontend.parse('place near the box'),
             RC_PLACE['PL_' + rc_key_short + '_NEAR'])
 
 
@@ -948,20 +950,20 @@ class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
         objs = [WorldObject(O_FULL_REACHABLE)]
         # NOTE: Only 'update objects' called; this ensures we must
         # update the robot in each test method before the parser will
         # run (as we want both to be specified). We could call 'set
         # world' instead but this ensures we write the tests correctly.
-        self.parser.update_objects(world_objects=objs)
+        self.frontend.update_objects(world_objects=objs)
 
     def test_left_preferred_right_requested(self):
-        self.parser.update_robot(Robot(R_LEFT_PREF))
+        self.frontend.update_robot(Robot(R_LEFT_PREF))
         self._check_side_requested('right_hand')
 
     def test_right_preferred_left_requested(self):
-        self.parser.update_robot(Robot(R_RIGHT_PREF))
+        self.frontend.update_robot(Robot(R_RIGHT_PREF))
         self._check_side_requested('left_hand')
 
     def _check_side_requested(self, side_rc):
@@ -978,92 +980,92 @@ class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
 
         # open / close
         self.assertEqual(
-            self.parser.parse('open ' + side_req)[0],
+            self.frontend.parse('open ' + side_req),
             RC_OPEN_CLOSE['OPEN' + rc_key_long])
         self.assertEqual(
-            self.parser.parse('close ' + side_req)[0],
+            self.frontend.parse('close ' + side_req),
             RC_OPEN_CLOSE['CLOSE' + rc_key_long])
 
         # moveabs
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' up')[0],
+            self.frontend.parse('move ' + side_req + ' up'),
             RC_MOVEABS[rc_key_short + '_UP'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' down')[0],
+            self.frontend.parse('move ' + side_req + ' down'),
             RC_MOVEABS[rc_key_short + '_DOWN'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' left')[0],
+            self.frontend.parse('move ' + side_req + ' left'),
             RC_MOVEABS[rc_key_short + '_LEFT'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' right')[0],
+            self.frontend.parse('move ' + side_req + ' right'),
             RC_MOVEABS[rc_key_short + '_RIGHT'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' forward')[0],
+            self.frontend.parse('move ' + side_req + ' forward'),
             RC_MOVEABS[rc_key_short + '_FORWARD'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' backwards')[0],
+            self.frontend.parse('move ' + side_req + ' backwards'),
             RC_MOVEABS[rc_key_short + '_BACKWARD'])
 
         # moverel
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' above the box')[0],
+            self.frontend.parse('move ' + side_req + ' above the box'),
             RC_MOVEREL[rc_key_short + '_ABOVE'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' next-to the box')[0],
+            self.frontend.parse('move ' + side_req + ' next-to the box'),
             RC_MOVEREL[rc_key_short + '_NEXTTO'])
 
         self.assertEqual(
-            self.parser.parse(
-                'move ' + side_req + ' to-the-left-of the box')[0],
+            self.frontend.parse(
+                'move ' + side_req + ' to-the-left-of the box'),
             RC_MOVEREL[rc_key_short + '_LEFTOF'])
         self.assertEqual(
-            self.parser.parse(
-                'move ' + side_req + ' to-the-right-of the box')[0],
+            self.frontend.parse(
+                'move ' + side_req + ' to-the-right-of the box'),
             RC_MOVEREL[rc_key_short + '_RIGHTOF'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' in-front-of the box')[0],
+            self.frontend.parse('move ' + side_req + ' in-front-of the box'),
             RC_MOVEREL[rc_key_short + '_FRONTOF'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' behind the box')[0],
+            self.frontend.parse('move ' + side_req + ' behind the box'),
             RC_MOVEREL[rc_key_short + '_BEHIND'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' on-top-of the box')[0],
+            self.frontend.parse('move ' + side_req + ' on-top-of the box'),
             RC_MOVEREL[rc_key_short + '_TOPOF'])
         self.assertEqual(
-            self.parser.parse('move ' + side_req + ' near the box')[0],
+            self.frontend.parse('move ' + side_req + ' near the box'),
             RC_MOVEREL[rc_key_short + '_NEAR'])
 
         # pickup
         self.assertEqual(
-            self.parser.parse('pick-up with ' + side_req)[0],
+            self.frontend.parse('pick-up with ' + side_req),
             RC_PICKUP[rc_key_short])
 
         # place
         self.assertEqual(
-            self.parser.parse('place above the box with ' + side_req)[0],
+            self.frontend.parse('place above the box with ' + side_req),
             RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
         self.assertEqual(
-            self.parser.parse('place next-to the box with ' + side_req)[0],
+            self.frontend.parse('place next-to the box with ' + side_req),
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
         self.assertEqual(
-            self.parser.parse(
-                'place to-the-left-of the box with ' + side_req)[0],
+            self.frontend.parse(
+                'place to-the-left-of the box with ' + side_req),
             RC_PLACE['PL_' + rc_key_short + '_LEFTOF'])
         self.assertEqual(
-            self.parser.parse(
-                'place to-the-right-of the box with ' + side_req)[0],
+            self.frontend.parse(
+                'place to-the-right-of the box with ' + side_req),
             RC_PLACE['PL_' + rc_key_short + '_RIGHTOF'])
         self.assertEqual(
-            self.parser.parse('place in-front-of the box with ' + side_req)[0],
+            self.frontend.parse('place in-front-of the box with ' + side_req),
             RC_PLACE['PL_' + rc_key_short + '_FRONTOF'])
         self.assertEqual(
-            self.parser.parse('place behind the box with ' + side_req)[0],
+            self.frontend.parse('place behind the box with ' + side_req),
             RC_PLACE['PL_' + rc_key_short + '_BEHIND'])
         self.assertEqual(
-            self.parser.parse('place on-top-of the box with ' + side_req)[0],
+            self.frontend.parse('place on-top-of the box with ' + side_req),
             RC_PLACE['PL_' + rc_key_short + '_TOPOF'])
         self.assertEqual(
-            self.parser.parse('place near the box with ' + side_req)[0],
+            self.frontend.parse('place near the box with ' + side_req),
             RC_PLACE['PL_' + rc_key_short + '_NEAR'])
 
 
@@ -1071,12 +1073,12 @@ class FullMultiObjectsSimple(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
         objs = [
             WorldObject(O_FULL_REACHABLE),  # obj0
             WorldObject(O_FULL_REACHABLE_SECOND),  # obj1
         ]
-        self.parser.set_world(world_objects=objs)
+        self.frontend.set_world(world_objects=objs)
 
     def test_select_obj0(self):
         hands = ['right_hand', 'left_hand']
@@ -1108,71 +1110,71 @@ class FullMultiObjectsSimple(unittest.TestCase):
 
         # moverel
         self.assertEqual(
-            self.parser.parse('move ' + hand_str + ' above the ' + desc)[0],
+            self.frontend.parse('move ' + hand_str + ' above the ' + desc),
             RC_MOVEREL[rc_key_short + '_ABOVE' + objkey])
         self.assertEqual(
-            self.parser.parse('move ' + hand_str + ' next-to the ' + desc)[0],
+            self.frontend.parse('move ' + hand_str + ' next-to the ' + desc),
             RC_MOVEREL[rc_key_short + '_NEXTTO' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'move ' + hand_str + ' to-the-left-of the ' + desc)[0],
+            self.frontend.parse(
+                'move ' + hand_str + ' to-the-left-of the ' + desc),
             RC_MOVEREL[rc_key_short + '_LEFTOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'move ' + hand_str + ' to-the-right-of the ' + desc)[0],
+            self.frontend.parse(
+                'move ' + hand_str + ' to-the-right-of the ' + desc),
             RC_MOVEREL[rc_key_short + '_RIGHTOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'move ' + hand_str + ' in-front-of the ' + desc)[0],
+            self.frontend.parse(
+                'move ' + hand_str + ' in-front-of the ' + desc),
             RC_MOVEREL[rc_key_short + '_FRONTOF' + objkey])
         self.assertEqual(
-            self.parser.parse('move ' + hand_str + ' behind the ' + desc)[0],
+            self.frontend.parse('move ' + hand_str + ' behind the ' + desc),
             RC_MOVEREL[rc_key_short + '_BEHIND' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'move ' + hand_str + ' on-top-of the ' + desc)[0],
+            self.frontend.parse(
+                'move ' + hand_str + ' on-top-of the ' + desc),
             RC_MOVEREL[rc_key_short + '_TOPOF' + objkey])
         self.assertEqual(
-            self.parser.parse('move ' + hand_str + ' near the ' + desc)[0],
+            self.frontend.parse('move ' + hand_str + ' near the ' + desc),
             RC_MOVEREL[rc_key_short + '_NEAR' + objkey])
 
         # pickup
         self.assertEqual(
-            self.parser.parse('pick-up the ' + desc + ' with ' + hand_str)[0],
+            self.frontend.parse('pick-up the ' + desc + ' with ' + hand_str),
             RC_PICKUP[rc_key_short + objkey])
 
         # place
         self.assertEqual(
-            self.parser.parse(
-                'place above the ' + desc + ' with ' + hand_str)[0],
+            self.frontend.parse(
+                'place above the ' + desc + ' with ' + hand_str),
             RC_PLACE['PL_' + rc_key_short + '_ABOVE' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place next-to the ' + desc + ' with ' + hand_str)[0],
+            self.frontend.parse(
+                'place next-to the ' + desc + ' with ' + hand_str),
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place to-the-left-of the ' + desc + ' with ' + hand_str)[0],
+            self.frontend.parse(
+                'place to-the-left-of the ' + desc + ' with ' + hand_str),
             RC_PLACE['PL_' + rc_key_short + '_LEFTOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place to-the-right-of the ' + desc + ' with ' + hand_str)[0],
+            self.frontend.parse(
+                'place to-the-right-of the ' + desc + ' with ' + hand_str),
             RC_PLACE['PL_' + rc_key_short + '_RIGHTOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place in-front-of the ' + desc + ' with ' + hand_str)[0],
+            self.frontend.parse(
+                'place in-front-of the ' + desc + ' with ' + hand_str),
             RC_PLACE['PL_' + rc_key_short + '_FRONTOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place behind the ' + desc + ' with ' + hand_str)[0],
+            self.frontend.parse(
+                'place behind the ' + desc + ' with ' + hand_str),
             RC_PLACE['PL_' + rc_key_short + '_BEHIND' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place on-top-of the ' + desc + ' with ' + hand_str)[0],
+            self.frontend.parse(
+                'place on-top-of the ' + desc + ' with ' + hand_str),
             RC_PLACE['PL_' + rc_key_short + '_TOPOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place near the ' + desc + ' with ' + hand_str)[0],
+            self.frontend.parse(
+                'place near the ' + desc + ' with ' + hand_str),
             RC_PLACE['PL_' + rc_key_short + '_NEAR' + objkey])
 
 
@@ -1180,12 +1182,12 @@ class FullMultiObjectsPickHand(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
         objs = [
             WorldObject(O_RIGHT_POSSIBLE),  # obj0
             WorldObject(O_LEFT_POSSIBLE_SECOND),  # obj1
         ]
-        self.parser.set_world(world_objects=objs)
+        self.frontend.set_world(world_objects=objs)
 
     def test_pick_right(self):
         descs = [
@@ -1222,67 +1224,67 @@ class FullMultiObjectsPickHand(unittest.TestCase):
 
         # moverel
         self.assertEqual(
-            self.parser.parse('move above the ' + desc)[0],
+            self.frontend.parse('move above the ' + desc),
             RC_MOVEREL[rc_key_short + '_ABOVE' + objkey])
         self.assertEqual(
-            self.parser.parse('move next-to the ' + desc)[0],
+            self.frontend.parse('move next-to the ' + desc),
             RC_MOVEREL[rc_key_short + '_NEXTTO' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'move to-the-left-of the ' + desc)[0],
+            self.frontend.parse(
+                'move to-the-left-of the ' + desc),
             RC_MOVEREL[rc_key_short + '_LEFTOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'move to-the-right-of the ' + desc)[0],
+            self.frontend.parse(
+                'move to-the-right-of the ' + desc),
             RC_MOVEREL[rc_key_short + '_RIGHTOF' + objkey])
         self.assertEqual(
-            self.parser.parse('move in-front-of the ' + desc)[0],
+            self.frontend.parse('move in-front-of the ' + desc),
             RC_MOVEREL[rc_key_short + '_FRONTOF' + objkey])
         self.assertEqual(
-            self.parser.parse('move behind the ' + desc)[0],
+            self.frontend.parse('move behind the ' + desc),
             RC_MOVEREL[rc_key_short + '_BEHIND' + objkey])
         self.assertEqual(
-            self.parser.parse('move on-top-of the ' + desc)[0],
+            self.frontend.parse('move on-top-of the ' + desc),
             RC_MOVEREL[rc_key_short + '_TOPOF' + objkey])
         self.assertEqual(
-            self.parser.parse('move near the ' + desc)[0],
+            self.frontend.parse('move near the ' + desc),
             RC_MOVEREL[rc_key_short + '_NEAR' + objkey])
 
         # pickup
         self.assertEqual(
-            self.parser.parse('pick-up the ' + desc)[0],
+            self.frontend.parse('pick-up the ' + desc),
             RC_PICKUP[rc_key_short + objkey])
 
         # place
         self.assertEqual(
-            self.parser.parse('place above the ' + desc)[0],
+            self.frontend.parse('place above the ' + desc),
             RC_PLACE['PL_' + rc_key_short + '_ABOVE' + objkey])
         self.assertEqual(
-            self.parser.parse('place next-to the ' + desc)[0],
+            self.frontend.parse('place next-to the ' + desc),
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place to-the-left-of the ' + desc)[0],
+            self.frontend.parse(
+                'place to-the-left-of the ' + desc),
             RC_PLACE['PL_' + rc_key_short + '_LEFTOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place to-the-right-of the ' + desc)[0],
+            self.frontend.parse(
+                'place to-the-right-of the ' + desc),
             RC_PLACE['PL_' + rc_key_short + '_RIGHTOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place in-front-of the ' + desc)[0],
+            self.frontend.parse(
+                'place in-front-of the ' + desc),
             RC_PLACE['PL_' + rc_key_short + '_FRONTOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place behind the ' + desc)[0],
+            self.frontend.parse(
+                'place behind the ' + desc),
             RC_PLACE['PL_' + rc_key_short + '_BEHIND' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place on-top-of the ' + desc)[0],
+            self.frontend.parse(
+                'place on-top-of the ' + desc),
             RC_PLACE['PL_' + rc_key_short + '_TOPOF' + objkey])
         self.assertEqual(
-            self.parser.parse(
-                'place near the ' + desc)[0],
+            self.frontend.parse(
+                'place near the ' + desc),
             RC_PLACE['PL_' + rc_key_short + '_NEAR' + objkey])
 
 
@@ -1297,20 +1299,20 @@ class FullImpossibleRobotCommands(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
 
     def test_impossible_openclose(self):
         robot = Robot({
             'gripper_states': ['closed_empty', 'open'],
             'last_cmd_side': 'right_hand',
         })
-        self.parser.set_world(robot=robot)
+        self.frontend.set_world(robot=robot)
         self.assertEqual(
-            self.parser.parse('open left-hand')[0],
+            self.frontend.parse('open left-hand'),
             RC_OPEN_CLOSE['OPENLEFT']
         )
         self.assertEqual(
-            self.parser.parse('close right-hand')[0],
+            self.frontend.parse('close right-hand'),
             RC_OPEN_CLOSE['CLOSERIGHT']
         )
 
@@ -1318,21 +1320,21 @@ class FullImpossibleRobotCommands(unittest.TestCase):
             'gripper_states': ['open', 'has_obj'],
             'last_cmd_side': 'left_hand',
         })
-        self.parser.set_world(robot=robot)
+        self.frontend.set_world(robot=robot)
         self.assertEqual(
-            self.parser.parse('release right-hand')[0],
+            self.frontend.parse('release right-hand'),
             RC_OPEN_CLOSE['OPENRIGHT']
         )
         self.assertEqual(
-            self.parser.parse('close left-hand')[0],
+            self.frontend.parse('close left-hand'),
             RC_OPEN_CLOSE['CLOSELEFT']
         )
 
     def test_moveabs(self):
-        self.parser.set_world(robot=Robot(R_NEITHER_POSSIBLE))
+        self.frontend.set_world(robot=Robot(R_NEITHER_POSSIBLE))
         for cmd in S_MOVEABS.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_MOVEABS[cmd])[0], RC_MOVEABS[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_MOVEABS[cmd]), RC_MOVEABS[cmd])
 
 
 class FullImpossibleObjCommands(unittest.TestCase):
@@ -1346,26 +1348,26 @@ class FullImpossibleObjCommands(unittest.TestCase):
     def setUp(self):
         Info.printing = False
         Debug.printing = False
-        self.parser = Parser()
+        self.frontend = Frontend()
         objs = [
             WorldObject(O_IMPOSSIBLE),  # obj0
         ]
-        self.parser.set_world(world_objects=objs)
+        self.frontend.set_world(world_objects=objs)
 
     def test_moverel(self):
         for cmd in S_MOVEREL.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_MOVEREL[cmd])[0], RC_MOVEREL[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_MOVEREL[cmd]), RC_MOVEREL[cmd])
 
     def test_pickup(self):
         for cmd in S_PICKUP.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_PICKUP[cmd])[0], RC_PICKUP[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_PICKUP[cmd]), RC_PICKUP[cmd])
 
     def test_place(self):
         for cmd in S_PLACE.iterkeys():
-            self.assertEqual(self.parser.parse(
-                S_PLACE[cmd])[0], RC_PLACE[cmd])
+            self.assertEqual(self.frontend.parse(
+                S_PLACE[cmd]), RC_PLACE[cmd])
 
 
 # TODO: This is where we really test the tuning of the system. We need

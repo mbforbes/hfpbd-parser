@@ -7,6 +7,7 @@ __author__ = 'mbforbes'
 # Imports
 # ######################################################################
 
+import os
 import sys
 
 
@@ -92,6 +93,21 @@ class Info(Logger):
 class Debug(Logger):
     printing = DEBUG_PRINTING_DEFAULT
     prefix = '[DEBUG]'
+
+
+class Fs:
+    '''File system.'''
+    @staticmethod
+    def data_dir():
+        '''
+        Returns the directory where our data (e.g. command grammar)
+        files live.
+        '''
+        return (
+            os.sep.join(
+                os.path.dirname(os.path.realpath(__file__)).split(os.sep)[:-1]
+                + ['data']
+            ) + os.sep)
 
 
 class Numbers:

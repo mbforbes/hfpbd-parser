@@ -17,7 +17,7 @@ import yaml
 from flask import Flask, render_template, request
 
 # Local
-from hybridbayes import Parser
+from parser.core.frontends import WebFrontend
 
 ########################################################################
 # Main (execution starts here)
@@ -25,16 +25,10 @@ from hybridbayes import Parser
 
 app = Flask(__name__)
 
-# Make parser stuff
-parser = Parser(buffer_printing=True)
-if not parser.startup_ros(spin=False):
-    parser.set_default_world()
-
-# Get vars to display
-print 'loading'
-world = yaml.load(open('world.yml'))
-objs = world['objects']
-robot = world['robot']
+# Make parser frontend, enabling ROS if possible.
+frontend = WebFrontend()
+if not frontend.startup_ros(spin=False):
+    frontend.set_default_world()
 
 
 @app.route('/style.css')
@@ -45,13 +39,15 @@ def style():
 @app.route('/', methods=['GET', 'POST'])
 def parse():
     try:
-        objs_str = parser.get_world_objects_str()
-        robot_str = parser.get_robot_str()
+        objs_str = frontend.get_world_objects_str()
+        robot_str = frontend.get_robot_str()
 
         if request.method == 'POST':
             # TODO process
             data = request.form['inputtext']
-            res, debug = parser.parse(data)
+            res = frontend.parse(data)
+            print res
+            debug = frontend.get_buffer()
             return render_template(
                 'template.html',
                 response=str(res),
