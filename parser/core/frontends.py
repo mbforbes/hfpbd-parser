@@ -203,7 +203,7 @@ class ROSFrontend(Frontend):
             return
 
         # Parse; ROS response happens in parser automatically.
-        robotCommand, buf_log = self.parse(recog_str)
+        self.parse(recog_str)
 
     def world_objects_cb(self, world_objects):
         '''ROS-specific: Callback for when world objects are received

@@ -46,7 +46,6 @@ def parse():
             # TODO process
             data = request.form['inputtext']
             res = frontend.parse(data)
-            print res
             debug = frontend.get_buffer()
             return render_template(
                 'template.html',

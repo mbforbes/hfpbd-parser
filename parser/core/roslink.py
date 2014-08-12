@@ -158,7 +158,7 @@ class WorldObject(PropertyGetter):
                 if len(rwo_val) == 2:
                     props[op_boolarr] = rwo_val
 
-            wobjs += [WorldObject(obj)]
+            wobjs += [WorldObject(props)]
         return wobjs
 
     @staticmethod
