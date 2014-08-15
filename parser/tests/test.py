@@ -9,11 +9,11 @@ Tests for Full include
     [x] Action 2: move ( rel_pose , object , arm_side )
     [x] Action 3: move ( abs_direction , arm_side )
     [x] Action 4: move ( rel_direction , object , arm_side )
-    [ ] Action 5: place ( abs_loc , arm_side )
+    [x] Action 5: place ( abs_loc , arm_side )
     [x] Action 6: place ( rel_pose , object , arm_side )
     [x] Action 7: pick_up ( object , arm_side )
-    [ ] Action 8: point_to ( object , arm_side )
-    [ ] Action 9: rotate ( joint , rotation_direction )
+    [x] Action 8: point_to ( object , arm_side )
+    [x] Action 9: rotate ( joint , rotation_direction )
     [x] Action 10: look_at ( object )
     [x] Action 11: open ( arm_side )
     [x] Action 12: close ( arm_side )
@@ -104,6 +104,7 @@ S_PICKUP = {
 }
 S_PLACELOC = {
     'RH_TABLE': 'place on-the-table with your right-hand',
+    'LH_TABLE': 'place on-the-table with your left-hand',
 }
 S_PLACE = {
     'RH_ABOVE': 'place above the red box with your right-hand',
@@ -123,10 +124,19 @@ S_PLACE = {
     'LH_BEHIND': 'place behind the red box with your left-hand',
     'LH_TOPOF': 'place on-top-of the red box with your left-hand',
     'LH_NEAR': 'place near the red box with your left-hand',
-
 }
 S_LOOKAT = {
     'LOOKAT': 'look at the red box',
+}
+S_POINTTO = {
+    'RH': 'point-to the red box with your right-hand',
+    'LH': 'point-to the red box with your left-hand',
+}
+S_ROTATE = {
+    'RH_CW': 'rotate your right-hand clockwise',
+    'RH_CCW': 'rotate your right-hand counterclockwise',
+    'LH_CW': 'rotate your left-hand clockwise',
+    'LH_CCW': 'rotate your left-hand counterclockwise',
 }
 
 # RobotCommands (RC)
@@ -272,6 +282,12 @@ RC_PICKUP = {
         'pick_up', ['obj1', 'left_hand']),
 
 }
+RC_PLACELOC = {
+    'RH_TABLE': RobotCommand.from_strs(
+        'place_loc', ['table', 'right_hand']),
+    'LH_TABLE': RobotCommand.from_strs(
+        'place_loc', ['table', 'left_hand']),
+}
 RC_PLACE = {
     # obj0
     'RH_ABOVE': RobotCommand.from_strs(
@@ -351,6 +367,28 @@ RC_LOOKAT = {
     # obj1
     'LOOKAT2': RobotCommand.from_strs(
         'look_at', ['obj1']),
+}
+RC_POINTTO = {
+    # obj0
+    'RH': RobotCommand.from_strs(
+        'point_to', ['obj0', 'right_hand']),
+    'LH': RobotCommand.from_strs(
+        'point_to', ['obj0', 'left_hand']),
+    # obj1
+    'RH2': RobotCommand.from_strs(
+        'point_to', ['obj1', 'right_hand']),
+    'LH2': RobotCommand.from_strs(
+        'point_to', ['obj1', 'left_hand']),
+}
+RC_ROTATE = {
+    'RH_CW': RobotCommand.from_strs(
+        'rotate', ['right_hand', 'cw']),
+    'RH_CCW': RobotCommand.from_strs(
+        'rotate', ['right_hand', 'ccw']),
+    'LH_CW': RobotCommand.from_strs(
+        'rotate', ['left_hand', 'cw']),
+    'LH_CCW': RobotCommand.from_strs(
+        'rotate', ['left_hand', 'ccw']),
 }
 
 # Objects (O)
@@ -588,6 +626,16 @@ class FullNoContext(unittest.TestCase):
             self.assertEqual(self.frontend.parse(
                 S_MOVEABSPOS[cmd]), RC_MOVEABSPOS[cmd])
 
+    def test_placeloc(self):
+        for cmd in S_PLACELOC.iterkeys():
+            self.assertEqual(self.frontend.parse(
+                S_PLACELOC[cmd]), RC_PLACELOC[cmd])
+
+    def test_rotate(self):
+        for cmd in S_ROTATE.iterkeys():
+            self.assertEqual(self.frontend.parse(
+                S_ROTATE[cmd]), RC_ROTATE[cmd])
+
 
 class FullInferOpenClose(unittest.TestCase):
     def setUp(self):
@@ -685,10 +733,25 @@ class FullOneObjNoRobot(unittest.TestCase):
             self.assertEqual(self.frontend.parse(
                 S_PLACE[cmd]), RC_PLACE[cmd])
 
+    def test_placeloc(self):
+        for cmd in S_PLACELOC.iterkeys():
+            self.assertEqual(self.frontend.parse(
+                S_PLACELOC[cmd]), RC_PLACELOC[cmd])
+
     def test_lookat(self):
         for cmd in S_LOOKAT.iterkeys():
             self.assertEqual(self.frontend.parse(
                 S_LOOKAT[cmd]), RC_LOOKAT[cmd])
+
+    def test_pointto(self):
+        for cmd in S_POINTTO.iterkeys():
+            self.assertEqual(self.frontend.parse(
+                S_POINTTO[cmd]), RC_POINTTO[cmd])
+
+    def test_rotate(self):
+        for cmd in S_ROTATE.iterkeys():
+            self.assertEqual(self.frontend.parse(
+                S_ROTATE[cmd]), RC_ROTATE[cmd])
 
     def test_synonyms(self):
         self.assertEqual(
@@ -863,7 +926,7 @@ class FullOneObjRobotSidePref(unittest.TestCase):
             self.frontend.parse('move near the box'),
             RC_MOVEREL[rc_key_short + '_NEAR'])
 
-        # pickup, place
+        # pickup
         self.assertEqual(
             self.frontend.parse('pick-up'),
             RC_PICKUP[rc_key_short])
@@ -874,6 +937,7 @@ class FullOneObjRobotSidePref(unittest.TestCase):
             self.frontend.parse('place next-to the box'),
             RC_PLACE[rc_key_short + '_NEXTTO'])
 
+        # place
         self.assertEqual(
             self.frontend.parse('place to-the-left-of the box'),
             RC_PLACE[rc_key_short + '_LEFTOF'])
@@ -892,6 +956,24 @@ class FullOneObjRobotSidePref(unittest.TestCase):
         self.assertEqual(
             self.frontend.parse('place near the box'),
             RC_PLACE[rc_key_short + '_NEAR'])
+
+        # place loc
+        self.assertEqual(
+            self.frontend.parse('place on-the-table'),
+            RC_PLACELOC[rc_key_short + '_TABLE'])
+
+        # Point to
+        self.assertEqual(
+            self.frontend.parse('point-to the box'),
+            RC_POINTTO[rc_key_short])
+
+        # Rotate
+        self.assertEqual(
+            self.frontend.parse('rotate clockwise'),
+            RC_ROTATE[rc_key_short + '_CW'])
+        self.assertEqual(
+            self.frontend.parse('rotate counterclockwise'),
+            RC_ROTATE[rc_key_short + '_CCW'])
 
 
 class FullRobotOneSidePossible(unittest.TestCase):
@@ -1280,6 +1362,15 @@ class FullMultiObjectsSimple(unittest.TestCase):
                 'place near the ' + desc + ' with ' + hand_str),
             RC_PLACE[rc_key_short + '_NEAR' + objkey])
 
+        # Look at
+        self.assertEqual(
+            self.frontend.parse('look-at the ' + desc),
+            RC_LOOKAT['LOOKAT' + objkey])
+
+        # Point to
+        self.assertEqual(
+            self.frontend.parse('point-to the ' + desc + ' with ' + hand_str),
+            RC_POINTTO[rc_key_short + objkey])
 
 class FullMultiObjectsPickHand(unittest.TestCase):
     def setUp(self):
@@ -1398,6 +1489,9 @@ class FullMultiObjectsPickHand(unittest.TestCase):
                 'place near the ' + desc),
             RC_PLACE[rc_key_short + '_NEAR' + objkey])
 
+        # NOTE(mbforbes): We don't test point_to as we assume you can
+        # always point to any object you can see.
+
 
 class FullImpossibleRobotCommands(unittest.TestCase):
     '''
@@ -1450,7 +1544,7 @@ class FullImpossibleRobotCommands(unittest.TestCase):
 
 class FullImpossibleObjCommands(unittest.TestCase):
     '''
-    Cases where you ask it to pick up an object and neither hand can.
+    Cases where you ask it to do smt. w/ an object and neither hand can.
     The idea is the language should be 'so heavily weighted' that either
     the robot, or our model, should accept the command as requested and
     just say it can't do it. (I think this is a job for the robot).

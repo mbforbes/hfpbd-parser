@@ -25,6 +25,11 @@ commands:
         - side
         - rel_dir
         - obj
+    # Action 5: Place in absolute location (e.g. on the table).
+    place_loc:
+        - place_loc
+        - abs_loc
+        - side
     # Action 6: Place smthng at relative pose to an obj (left of cup)
     place:
         - place
@@ -36,6 +41,16 @@ commands:
         - pick_up
         - obj
         - side
+    # Action 8: Point to an object with an arm.
+    point_to:
+        - point_to
+        - obj
+        - side
+    # Action 9: Rotate a joint. (Note: currently just doing 'side'!)
+    rotate:
+        - rotate
+        - side
+        - rot_dir
     # Action 10: Look at an object (look at the biggest blue thing)
     look_at:
         - look_at
@@ -100,6 +115,12 @@ parameters:
     rel_dir:
         - towards
         - away
+    abs_loc:
+        - table
+    rot_dir:
+        - cw
+        - ccw
+    # NOTE: currently, also for joints! Expand if desired.
     side:
         - right_hand
         - left_hand
@@ -169,11 +190,26 @@ options:
             - place
             - put
         strategy: verb
+    place_loc:
+        phrases:
+            - place
+            - put
+        strategy: verb
     look_at:
         phrases:
             - look-at
             - look
             - turn-your-head
+        strategy: verb
+    point_to:
+        phrases:
+            - point-to
+            - point-at
+        strategy: verb
+    rotate:
+        phrases:
+            - rotate
+            - twist
         strategy: verb
     open:
         phrases:
@@ -267,6 +303,17 @@ options:
     away:
         phrases:
             - away-from
+# abs loc
+    table:
+        phrases:
+            - on-the-table
+# rot_dir
+    cw:
+        phrases:
+            - clockwise
+    ccw:
+        phrases:
+            - counterclockwise
 # side
     right_hand:
         phrases:
