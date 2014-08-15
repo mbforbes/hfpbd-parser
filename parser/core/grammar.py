@@ -428,42 +428,41 @@ class Command(object):
         if not self.has_obj_opt():
             return
 
-        # Currently, there should be exactly one object per command.
-        wobj = self.get_objs()[0]
-
         # We'll filter by name, as template sets will be brittle.
+
         # cmds: move_rel, place (params: relpos, side)
         if self.name in ['move_rel', 'place']:
-            relpos = self.option_map['rel_pos'].name
-            side = self.option_map['side'].name
-            # NOTE(mbforbes): What do we assume if there's no such
-            # property? I'll assume no informations means do not affect
-            # the score.
-            if wobj.has_property(C.m_op[relpos]):
-                reachables = wobj.get_property(C.m_op[relpos])
-                if side in C.sides:
-                    loc_reachable = reachables[C.side_to_idx[side]]
-                else:
-                    # Side == both
-                    loc_reachable = reachables[0] and reachables[1]
-                if not loc_reachable:
-                    self.score += N.P_LOCUNR
+            prop = C.m_op[self.option_map['rel_pos'].name]
+            if not self._get_reachable(prop):
+                self.score += N.P_LOCUNR
+
+        # cmds: move_rel_dir
+        if self.name in ['move_rel_dir']:
+            prop = C.m_op[self.option_map['rel_dir'].name]
+            if not self._get_reachable(prop):
+                self.score += N.P_LOCUNR
 
         # cmds: pickup (params: side)
         if self.name in ['pick_up']:
-            side = self.option_map['side'].name
-            # NOTE(mbforbes): What do we assume if there's no such
-            # property? I'll assume no informations means do not affect
-            # the score.
-            if wobj.has_property('is_pickupable'):
-                reachables = wobj.get_property('is_pickupable')
-                if side in C.sides:
-                    loc_reachable = reachables[C.side_to_idx[side]]
-                else:
-                    # Side == both
-                    loc_reachable = reachables[0] and reachables[1]
-                if not loc_reachable:
-                    self.score += N.P_OBJUNR
+            if not self._get_reachable('is_pickupable'):
+                self.score += N.P_OBJUNR
+
+    def _get_reachable(self, prop):
+        # Currently, there should be exactly one object per command.
+        wobj = self.get_objs()[0]
+        side = self.option_map['side'].name
+        if wobj.has_property(prop):
+            reachables = wobj.get_property(prop)
+            if side in C.sides:
+                loc_reachable = reachables[C.side_to_idx[side]]
+            else:
+                # Side == both
+                loc_reachable = reachables[0] and reachables[1]
+        else:
+            # By default we don't negatively weight, so if the object
+            # is missing some property, we assume it is reachable.
+            loc_reachable = True
+        return loc_reachable
 
     def apply_r(self, robot):
         '''

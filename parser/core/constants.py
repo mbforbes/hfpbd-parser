@@ -78,6 +78,7 @@ class C(object):
     # Map (M) from component options to object properties (OP).
     # The type of values for these, when set, are bool[]s.
     m_op = {
+        # abs
         'above': 'is_above_reachable',
         'next_to': 'is_nextto_reachable',
         'to_left_of': 'is_leftof_reachable',
@@ -86,6 +87,9 @@ class C(object):
         'behind': 'is_behind_reachable',
         'on_top_of': 'is_topof_reachable',
         'near': 'is_near_reachable',
+        # rel
+        'towards': 'is_towards_reachable',
+        'away': 'is_away_reachable',
     }
 
     # Map (M) from object properties to WordOption names (WO).

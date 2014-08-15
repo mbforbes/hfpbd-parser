@@ -1,34 +1,55 @@
 # commands -> parameters
 # There are the "functional" specification of the commands.
 commands:
+    # 'Programming' commands
+    # ----------------------
+    # Action 1: Move to an absolute pose (to the side)
+    move_abs_pos:
+        - move_abs_pos
+        - side
+        - abs_pos
+    # Action 2: Move to a pose relative to an object (left of red cup)
     move_rel:
         - move_rel
         - side
         - rel_pos
         - obj
+    # Action 3: Move arm in an absolute direction (left, up, down, etc.)
     move_abs:
         - move_abs
         - side
         - abs_dir
-    pick_up:
-        - pick_up
-        - obj
+    # Action 4: Move arm in reltive direction to obj (towards cup)
+    move_rel_dir:
+        - move_rel_dir
         - side
+        - rel_dir
+        - obj
+    # Action 6: Place smthng at relative pose to an obj (left of cup)
     place:
         - place
         - rel_pos
         - obj
         - side
+    # Action 7: Pick up an object with an arm (pick up cup w/ l arm)
+    pick_up:
+        - pick_up
+        - obj
+        - side
+    # Action 10: Look at an object (look at the biggest blue thing)
     look_at:
         - look_at
         - obj
+    # Action 11: Open one of the grippers (open right hand)
     open:
         - open
         - side
+    # Action 12: Close one of the grippers (close right hand)
     close:
         - close
         - side
     # 'Admin' commands
+    # ----------------
     execute:
         - execute
     stop:
@@ -58,6 +79,8 @@ commands:
 #
 # etc.
 parameters:
+    abs_pos:
+        - to_side
     rel_pos:
         - above
         - next_to
@@ -74,6 +97,9 @@ parameters:
         - to_right
         - forward
         - backward
+    rel_dir:
+        - towards
+        - away
     side:
         - right_hand
         - left_hand
@@ -119,7 +145,15 @@ options:
         phrases:
             - move
         strategy: verb
+    move_rel_dir:
+        phrases:
+            - move
+        strategy: verb
     move_abs:
+        phrases:
+            - move
+        strategy: verb
+    move_abs_pos:
         phrases:
             - move
         strategy: verb
@@ -167,6 +201,10 @@ options:
             - switch-to
         strategy: verb
 # params
+# abs_pos
+    to_side:
+        phrases:
+            - to-the-side
 # rel_pos
     above:
         phrases:
@@ -222,6 +260,13 @@ options:
         phrases:
             - backwards
             - closer
+# rel_dir
+    towards:
+        phrases:
+            - towards
+    away:
+        phrases:
+            - away-from
 # side
     right_hand:
         phrases:

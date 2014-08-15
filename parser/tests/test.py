@@ -5,10 +5,10 @@ Current test categories include:
     - Full: end-to-end tests (of entire system)
 
 Tests for Full include
-    [ ] Action 1: move ( abs_pose , arm_side )
+    [x] Action 1: move ( abs_pose , arm_side )
     [x] Action 2: move ( rel_pose , object , arm_side )
     [x] Action 3: move ( abs_direction , arm_side )
-    [ ] Action 4: move ( rel_direction , object , arm_side )
+    [x] Action 4: move ( rel_direction , object , arm_side )
     [ ] Action 5: place ( abs_pose , arm_side )
     [x] Action 6: place ( rel_pose , object , arm_side )
     [x] Action 7: pick_up ( object , arm_side )
@@ -54,6 +54,10 @@ S_OPEN_CLOSE = {
     'CLOSERIGHT': 'close right-hand',
     'CLOSELEFT': 'close left-hand',
 }
+S_MOVEABSPOS = {
+    'LH_TOSIDE': 'move left-hand to-the-side',
+    'RH_TOSIDE': 'move right-hand to-the-side',
+}
 S_MOVEABS = {
     'LH_UP': 'move left-hand up',
     'LH_DOWN': 'move left-hand down',
@@ -87,8 +91,12 @@ S_MOVEREL = {
     'LH_BEHIND': 'move left-hand behind the red box',
     'LH_TOPOF': 'move left-hand on-top-of the red box',
     'LH_NEAR': 'move left-hand near the red box',
-
-
+}
+S_MOVEREL_DIR = {
+    'RH_AWAY': 'move right-hand away-from the red box',
+    'RH_TOWARDS': 'move right-hand towards the red box',
+    'LH_AWAY': 'move left-hand away-from the red box',
+    'LH_TOWARDS': 'move left-hand towards the red box',
 }
 S_PICKUP = {
     'RH': 'pick-up the red box with your right-hand',
@@ -124,6 +132,12 @@ RC_OPEN_CLOSE = {
     'OPENLEFT': RobotCommand.from_strs('open', ['left_hand']),
     'CLOSERIGHT': RobotCommand.from_strs('close', ['right_hand']),
     'CLOSELEFT': RobotCommand.from_strs('close', ['left_hand']),
+}
+RC_MOVEABSPOS = {
+    'LH_TOSIDE': RobotCommand.from_strs(
+        'move_abs_pos', ['left_hand', 'to_side']),
+    'RH_TOSIDE': RobotCommand.from_strs(
+        'move_abs_pos', ['right_hand', 'to_side']),
 }
 RC_MOVEABS = {
     'LH_UP': RobotCommand.from_strs(
@@ -220,6 +234,28 @@ RC_MOVEREL = {
     'LH_NEAR2': RobotCommand.from_strs(
         'move_rel', ['left_hand', 'near', 'obj1']),
 }
+RC_MOVEREL_DIR = {
+    # obj0
+    'RH_AWAY': RobotCommand.from_strs(
+        'move_rel_dir', ['right_hand', 'away', 'obj0']),
+    'RH_TOWARDS': RobotCommand.from_strs(
+        'move_rel_dir', ['right_hand', 'towards', 'obj0']),
+    'LH_AWAY': RobotCommand.from_strs(
+        'move_rel_dir', ['left_hand', 'away', 'obj0']),
+    'LH_TOWARDS': RobotCommand.from_strs(
+        'move_rel_dir', ['left_hand', 'towards', 'obj0']),
+
+    # obj1
+    'RH_AWAY2': RobotCommand.from_strs(
+        'move_rel_dir', ['right_hand', 'away', 'obj1']),
+    'RH_TOWARDS2': RobotCommand.from_strs(
+        'move_rel_dir', ['right_hand', 'towards', 'obj1']),
+    'LH_AWAY2': RobotCommand.from_strs(
+        'move_rel_dir', ['left_hand', 'away', 'obj1']),
+    'LH_TOWARDS2': RobotCommand.from_strs(
+        'move_rel_dir', ['left_hand', 'towards', 'obj1']),
+}
+
 RC_PICKUP = {
     # obj0
     'RH': RobotCommand.from_strs(
@@ -327,6 +363,8 @@ O_FULL_REACHABLE = {
     'is_behind_reachable': [True, True],
     'is_topof_reachable': [True, True],
     'is_near_reachable': [True, True],
+    'is_towards_reachable': [True, True],
+    'is_away_reachable': [True, True],
     # Relation to other objects. These should be more general.
     'is_leftmost': False,
     'is_rightmost': False,
@@ -351,6 +389,8 @@ O_RIGHT_POSSIBLE = {
     'is_behind_reachable': [True, False],
     'is_topof_reachable': [True, False],
     'is_near_reachable': [True, False],
+    'is_towards_reachable': [True, False],
+    'is_away_reachable': [True, False],
     'is_leftmost': False,
     'is_rightmost': True,
     'is_biggest': False,
@@ -373,6 +413,8 @@ O_LEFT_POSSIBLE = {
     'is_behind_reachable': [False, True],
     'is_topof_reachable': [False, True],
     'is_near_reachable': [False, True],
+    'is_towards_reachable': [False, True],
+    'is_away_reachable': [False, True],
     # E.g. red, blue, green, unknown
     'color': 'red',
     # E.g. cup, box, unknown
@@ -391,6 +433,8 @@ O_LEFT_POSSIBLE_SECOND = {
     'is_behind_reachable': [False, True],
     'is_topof_reachable': [False, True],
     'is_near_reachable': [False, True],
+    'is_towards_reachable': [False, True],
+    'is_away_reachable': [False, True],
     'is_leftmost': True,
     'is_rightmost': False,
     'is_biggest': True,
@@ -414,6 +458,8 @@ O_FULL_REACHABLE_SECOND = {
     'is_behind_reachable': [True, True],
     'is_topof_reachable': [True, True],
     'is_near_reachable': [True, True],
+    'is_towards_reachable': [True, True],
+    'is_away_reachable': [True, True],
     # Relation to other objects. These should be more general.
     'is_leftmost': False,
     'is_rightmost': False,
@@ -437,6 +483,8 @@ O_IMPOSSIBLE = {
     'is_behind_reachable': [False, False],
     'is_topof_reachable': [False, False],
     'is_near_reachable': [False, False],
+    'is_towards_reachable': [False, False],
+    'is_away_reachable': [False, False],
     # Relation to other objects. These should be more general.
     'is_leftmost': False,
     'is_rightmost': False,
@@ -532,6 +580,11 @@ class FullNoContext(unittest.TestCase):
             self.assertEqual(self.frontend.parse(
                 S_MOVEABS[cmd]), RC_MOVEABS[cmd])
 
+    def test_moveabspos(self):
+        for cmd in S_MOVEABSPOS.iterkeys():
+            self.assertEqual(self.frontend.parse(
+                S_MOVEABSPOS[cmd]), RC_MOVEABSPOS[cmd])
+
 
 class FullInferOpenClose(unittest.TestCase):
     def setUp(self):
@@ -603,6 +656,16 @@ class FullOneObjNoRobot(unittest.TestCase):
         for cmd in S_MOVEABS.iterkeys():
             self.assertEqual(self.frontend.parse(
                 S_MOVEABS[cmd]), RC_MOVEABS[cmd])
+
+    def test_moveabspos(self):
+        for cmd in S_MOVEABSPOS.iterkeys():
+            self.assertEqual(self.frontend.parse(
+                S_MOVEABSPOS[cmd]), RC_MOVEABSPOS[cmd])
+
+    def test_movereldir(self):
+        for cmd in S_MOVEREL_DIR.iterkeys():
+            self.assertEqual(self.frontend.parse(
+                S_MOVEREL_DIR[cmd]), RC_MOVEREL_DIR[cmd])
 
     def test_moverel(self):
         for cmd in S_MOVEREL.iterkeys():
@@ -757,6 +820,19 @@ class FullOneObjRobotSidePref(unittest.TestCase):
         self.assertEqual(
             self.frontend.parse('move backwards'),
             RC_MOVEABS[rc_key_short + '_BACKWARD'])
+
+        # moveabspos
+        self.assertEqual(
+            self.frontend.parse('move to-the-side'),
+            RC_MOVEABSPOS[rc_key_short + '_TOSIDE'])
+
+        # movereldir
+        self.assertEqual(
+            self.frontend.parse('move away-from the box'),
+            RC_MOVEREL_DIR[rc_key_short + '_AWAY'])
+        self.assertEqual(
+            self.frontend.parse('move towards the box'),
+            RC_MOVEREL_DIR[rc_key_short + '_TOWARDS'])
 
         # moverel
         self.assertEqual(
@@ -914,6 +990,14 @@ class FullObjectOneSidePossible(unittest.TestCase):
             self.frontend.parse('move near the box'),
             RC_MOVEREL[rc_key_short + '_NEAR'])
 
+        # movereldir
+        self.assertEqual(
+            self.frontend.parse('move away-from the box'),
+            RC_MOVEREL_DIR[rc_key_short + '_AWAY'])
+        self.assertEqual(
+            self.frontend.parse('move towards the box'),
+            RC_MOVEREL_DIR[rc_key_short + '_TOWARDS'])
+
         # pickup
         self.assertEqual(
             self.frontend.parse('pick-up the red box'),
@@ -1035,6 +1119,14 @@ class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
             self.frontend.parse('move ' + side_req + ' near the box'),
             RC_MOVEREL[rc_key_short + '_NEAR'])
 
+        # movereldir
+        self.assertEqual(
+            self.frontend.parse('move ' + side_req + ' away-from the box'),
+            RC_MOVEREL_DIR[rc_key_short + '_AWAY'])
+        self.assertEqual(
+            self.frontend.parse('move ' + side_req + ' towards the box'),
+            RC_MOVEREL_DIR[rc_key_short + '_TOWARDS'])
+
         # pickup
         self.assertEqual(
             self.frontend.parse('pick-up with ' + side_req),
@@ -1137,6 +1229,14 @@ class FullMultiObjectsSimple(unittest.TestCase):
         self.assertEqual(
             self.frontend.parse('move ' + hand_str + ' near the ' + desc),
             RC_MOVEREL[rc_key_short + '_NEAR' + objkey])
+
+        # movereldir
+        self.assertEqual(
+            self.frontend.parse('move ' + hand_str + ' away-from the ' + desc),
+            RC_MOVEREL_DIR[rc_key_short + '_AWAY' + objkey])
+        self.assertEqual(
+            self.frontend.parse('move ' + hand_str + ' towards the ' + desc),
+            RC_MOVEREL_DIR[rc_key_short + '_TOWARDS' + objkey])
 
         # pickup
         self.assertEqual(
@@ -1250,6 +1350,14 @@ class FullMultiObjectsPickHand(unittest.TestCase):
             self.frontend.parse('move near the ' + desc),
             RC_MOVEREL[rc_key_short + '_NEAR' + objkey])
 
+        # movereldir
+        self.assertEqual(
+            self.frontend.parse('move away-from the ' + desc),
+            RC_MOVEREL_DIR[rc_key_short + '_AWAY' + objkey])
+        self.assertEqual(
+            self.frontend.parse('move towards the ' + desc),
+            RC_MOVEREL_DIR[rc_key_short + '_TOWARDS' + objkey])
+
         # pickup
         self.assertEqual(
             self.frontend.parse('pick-up the ' + desc),
@@ -1358,6 +1466,11 @@ class FullImpossibleObjCommands(unittest.TestCase):
         for cmd in S_MOVEREL.iterkeys():
             self.assertEqual(self.frontend.parse(
                 S_MOVEREL[cmd]), RC_MOVEREL[cmd])
+
+    def test_movereldir(self):
+        for cmd in S_MOVEREL_DIR.iterkeys():
+            self.assertEqual(self.frontend.parse(
+                S_MOVEREL_DIR[cmd]), RC_MOVEREL_DIR[cmd])
 
     def test_pickup(self):
         for cmd in S_PICKUP.iterkeys():
