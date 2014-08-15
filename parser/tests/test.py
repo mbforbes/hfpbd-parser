@@ -9,7 +9,7 @@ Tests for Full include
     [x] Action 2: move ( rel_pose , object , arm_side )
     [x] Action 3: move ( abs_direction , arm_side )
     [x] Action 4: move ( rel_direction , object , arm_side )
-    [ ] Action 5: place ( abs_pose , arm_side )
+    [ ] Action 5: place ( abs_loc , arm_side )
     [x] Action 6: place ( rel_pose , object , arm_side )
     [x] Action 7: pick_up ( object , arm_side )
     [ ] Action 8: point_to ( object , arm_side )
@@ -101,6 +101,9 @@ S_MOVEREL_DIR = {
 S_PICKUP = {
     'RH': 'pick-up the red box with your right-hand',
     'LH': 'pick-up the red box with your left-hand',
+}
+S_PLACELOC = {
+    'RH_TABLE': 'place on-the-table with your right-hand',
 }
 S_PLACE = {
     'PL_RH_ABOVE': 'place above the red box with your right-hand',
@@ -271,74 +274,74 @@ RC_PICKUP = {
 }
 RC_PLACE = {
     # obj0
-    'PL_RH_ABOVE': RobotCommand.from_strs(
+    'RH_ABOVE': RobotCommand.from_strs(
         'place', ['above', 'obj0', 'right_hand']),
-    'PL_RH_NEXTTO': RobotCommand.from_strs(
+    'RH_NEXTTO': RobotCommand.from_strs(
         'place', ['next_to', 'obj0', 'right_hand']),
-    'PL_RH_LEFTOF': RobotCommand.from_strs(
+    'RH_LEFTOF': RobotCommand.from_strs(
         'place', ['to_left_of', 'obj0', 'right_hand']),
-    'PL_RH_RIGHTOF': RobotCommand.from_strs(
+    'RH_RIGHTOF': RobotCommand.from_strs(
         'place', ['to_right_of', 'obj0', 'right_hand']),
-    'PL_RH_FRONTOF': RobotCommand.from_strs(
+    'RH_FRONTOF': RobotCommand.from_strs(
         'place', ['in_front_of', 'obj0', 'right_hand']),
-    'PL_RH_BEHIND': RobotCommand.from_strs(
+    'RH_BEHIND': RobotCommand.from_strs(
         'place', ['behind', 'obj0', 'right_hand']),
-    'PL_RH_TOPOF': RobotCommand.from_strs(
+    'RH_TOPOF': RobotCommand.from_strs(
         'place', ['on_top_of', 'obj0', 'right_hand']),
-    'PL_RH_NEAR': RobotCommand.from_strs(
+    'RH_NEAR': RobotCommand.from_strs(
         'place', ['near', 'obj0', 'right_hand']),
 
-    'PL_LH_ABOVE': RobotCommand.from_strs(
+    'LH_ABOVE': RobotCommand.from_strs(
         'place', ['above', 'obj0', 'left_hand']),
-    'PL_LH_NEXTTO': RobotCommand.from_strs(
+    'LH_NEXTTO': RobotCommand.from_strs(
         'place', ['next_to', 'obj0', 'left_hand']),
-    'PL_LH_LEFTOF': RobotCommand.from_strs(
+    'LH_LEFTOF': RobotCommand.from_strs(
         'place', ['to_left_of', 'obj0', 'left_hand']),
-    'PL_LH_RIGHTOF': RobotCommand.from_strs(
+    'LH_RIGHTOF': RobotCommand.from_strs(
         'place', ['to_right_of', 'obj0', 'left_hand']),
-    'PL_LH_FRONTOF': RobotCommand.from_strs(
+    'LH_FRONTOF': RobotCommand.from_strs(
         'place', ['in_front_of', 'obj0', 'left_hand']),
-    'PL_LH_BEHIND': RobotCommand.from_strs(
+    'LH_BEHIND': RobotCommand.from_strs(
         'place', ['behind', 'obj0', 'left_hand']),
-    'PL_LH_TOPOF': RobotCommand.from_strs(
+    'LH_TOPOF': RobotCommand.from_strs(
         'place', ['on_top_of', 'obj0', 'left_hand']),
-    'PL_LH_NEAR': RobotCommand.from_strs(
+    'LH_NEAR': RobotCommand.from_strs(
         'place', ['near', 'obj0', 'left_hand']),
 
 
     # new obj1
-    'PL_RH_ABOVE2': RobotCommand.from_strs(
+    'RH_ABOVE2': RobotCommand.from_strs(
         'place', ['above', 'obj1', 'right_hand']),
-    'PL_RH_NEXTTO2': RobotCommand.from_strs(
+    'RH_NEXTTO2': RobotCommand.from_strs(
         'place', ['next_to', 'obj1', 'right_hand']),
-    'PL_RH_LEFTOF2': RobotCommand.from_strs(
+    'RH_LEFTOF2': RobotCommand.from_strs(
         'place', ['to_left_of', 'obj1', 'right_hand']),
-    'PL_RH_RIGHTOF2': RobotCommand.from_strs(
+    'RH_RIGHTOF2': RobotCommand.from_strs(
         'place', ['to_right_of', 'obj1', 'right_hand']),
-    'PL_RH_FRONTOF2': RobotCommand.from_strs(
+    'RH_FRONTOF2': RobotCommand.from_strs(
         'place', ['in_front_of', 'obj1', 'right_hand']),
-    'PL_RH_BEHIND2': RobotCommand.from_strs(
+    '_RH_BEHIND2': RobotCommand.from_strs(
         'place', ['behind', 'obj1', 'right_hand']),
-    'PL_RH_TOPOF2': RobotCommand.from_strs(
+    'RH_TOPOF2': RobotCommand.from_strs(
         'place', ['on_top_of', 'obj1', 'right_hand']),
-    'PL_RH_NEAR2': RobotCommand.from_strs(
+    'RH_NEAR2': RobotCommand.from_strs(
         'place', ['near', 'obj1', 'right_hand']),
 
-    'PL_LH_ABOVE2': RobotCommand.from_strs(
+    'LH_ABOVE2': RobotCommand.from_strs(
         'place', ['above', 'obj1', 'left_hand']),
-    'PL_LH_NEXTTO2': RobotCommand.from_strs(
+    'LH_NEXTTO2': RobotCommand.from_strs(
         'place', ['next_to', 'obj1', 'left_hand']),
-    'PL_LH_LEFTOF2': RobotCommand.from_strs(
+    'LH_LEFTOF2': RobotCommand.from_strs(
         'place', ['to_left_of', 'obj1', 'left_hand']),
-    'PL_LH_RIGHTOF2': RobotCommand.from_strs(
+    'LH_RIGHTOF2': RobotCommand.from_strs(
         'place', ['to_right_of', 'obj1', 'left_hand']),
-    'PL_LH_FRONTOF2': RobotCommand.from_strs(
+    'LH_FRONTOF2': RobotCommand.from_strs(
         'place', ['in_front_of', 'obj1', 'left_hand']),
-    'PL_LH_BEHIND2': RobotCommand.from_strs(
+    'LH_BEHIND2': RobotCommand.from_strs(
         'place', ['behind', 'obj1', 'left_hand']),
-    'PL_LH_TOPOF2': RobotCommand.from_strs(
+    'LH_TOPOF2': RobotCommand.from_strs(
         'place', ['on_top_of', 'obj1', 'left_hand']),
-    'PL_LH_NEAR2': RobotCommand.from_strs(
+    'LH_NEAR2': RobotCommand.from_strs(
         'place', ['near', 'obj1', 'left_hand']),
 }
 RC_LOOKAT = {
@@ -866,7 +869,7 @@ class FullOneObjRobotSidePref(unittest.TestCase):
             RC_PICKUP[rc_key_short])
         self.assertEqual(
             self.frontend.parse('place above the box'),
-            RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
+            RC_PLACE[rc_key_short + '_ABOVE'])
         self.assertEqual(
             self.frontend.parse('place next-to the box'),
             RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
