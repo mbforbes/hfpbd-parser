@@ -19,10 +19,10 @@ Tests for Full include
     [x] Action 12: close ( arm_side )
 
     Plus 'admin' commands:
-    [ ] Create new action
-    [ ] Switch to action ( which )
-    [ ] Execute
-    [ ] Stop
+    [x] Create new action
+    [x] Switch to action ( which )
+    [x] Execute
+    [x] Stop
 '''
 
 __author__ = 'mbforbes'
@@ -602,6 +602,50 @@ class TestDefaultMatcher(unittest.TestCase):
             'right-hand', 'right-hand'), 0.0)
         self.assertNotEqual(DefaultMatcher.match(
             'right', 'right-hand right'), 0.0)
+
+
+class FullAdminCommands(unittest.TestCase):
+    def setUp(self):
+        Info.printing = False
+        Debug.printing = False
+        self.frontend = Frontend()
+        self.frontend.set_world()
+
+    def test_execute(self):
+        execute_cmds = ['execute', 'execute program', 'execute action']
+        for cmd in execute_cmds:
+            self.assertEqual(
+                self.frontend.parse(cmd),
+                RobotCommand.from_strs('execute', []))
+
+    def test_stop(self):
+        execute_cmds = ['stop', 'stop executing', 'stop execution']
+        for cmd in execute_cmds:
+            self.assertEqual(
+                self.frontend.parse(cmd),
+                RobotCommand.from_strs('stop', []))
+
+    def test_createnew(self):
+        execute_cmds = ['create-new', 'create-new action']
+        for cmd in execute_cmds:
+            self.assertEqual(
+                self.frontend.parse(cmd),
+                RobotCommand.from_strs('create_new_action', ['action']))
+
+    def test_switch_next(self):
+        execute_cmds = ['switch-to next action', 'next action']
+        for cmd in execute_cmds:
+            self.assertEqual(
+                self.frontend.parse(cmd),
+                RobotCommand.from_strs('switch_action', ['next', 'action']))
+
+    def test_switch_prev(self):
+        execute_cmds = ['switch-to previous action', 'previous action']
+        for cmd in execute_cmds:
+            self.assertEqual(
+                self.frontend.parse(cmd),
+                RobotCommand.from_strs(
+                    'switch_action', ['previous', 'action']))
 
 
 class FullNoContext(unittest.TestCase):
@@ -1371,6 +1415,7 @@ class FullMultiObjectsSimple(unittest.TestCase):
         self.assertEqual(
             self.frontend.parse('point-to the ' + desc + ' with ' + hand_str),
             RC_POINTTO[rc_key_short + objkey])
+
 
 class FullMultiObjectsPickHand(unittest.TestCase):
     def setUp(self):
