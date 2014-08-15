@@ -106,23 +106,23 @@ S_PLACELOC = {
     'RH_TABLE': 'place on-the-table with your right-hand',
 }
 S_PLACE = {
-    'PL_RH_ABOVE': 'place above the red box with your right-hand',
-    'PL_RH_NEXTTO': 'place next-to the red box with your right-hand',
-    'PL_RH_LEFTOF': 'place to-the-left-of the red box with your right-hand',
-    'PL_RH_RIGHTOF': 'place to-the-right-of the red box with your right-hand',
-    'PL_RH_FRONTOF': 'place in-front-of the red box with your right-hand',
-    'PL_RH_BEHIND': 'place behind the red box with your right-hand',
-    'PL_RH_TOPOF': 'place on-top-of the red box with your right-hand',
-    'PL_RH_NEAR': 'place near the red box with your right-hand',
+    'RH_ABOVE': 'place above the red box with your right-hand',
+    'RH_NEXTTO': 'place next-to the red box with your right-hand',
+    'RH_LEFTOF': 'place to-the-left-of the red box with your right-hand',
+    'RH_RIGHTOF': 'place to-the-right-of the red box with your right-hand',
+    'RH_FRONTOF': 'place in-front-of the red box with your right-hand',
+    'RH_BEHIND': 'place behind the red box with your right-hand',
+    'RH_TOPOF': 'place on-top-of the red box with your right-hand',
+    'RH_NEAR': 'place near the red box with your right-hand',
 
-    'PL_LH_ABOVE': 'place above the red box with your left-hand',
-    'PL_LH_NEXTTO': 'place next-to the red box with your left-hand',
-    'PL_LH_LEFTOF': 'place to-the-left-of the red box with your left-hand',
-    'PL_LH_RIGHTOF': 'place to-the-right-of the red box with your left-hand',
-    'PL_LH_FRONTOF': 'place in-front-of the red box with your left-hand',
-    'PL_LH_BEHIND': 'place behind the red box with your left-hand',
-    'PL_LH_TOPOF': 'place on-top-of the red box with your left-hand',
-    'PL_LH_NEAR': 'place near the red box with your left-hand',
+    'LH_ABOVE': 'place above the red box with your left-hand',
+    'LH_NEXTTO': 'place next-to the red box with your left-hand',
+    'LH_LEFTOF': 'place to-the-left-of the red box with your left-hand',
+    'LH_RIGHTOF': 'place to-the-right-of the red box with your left-hand',
+    'LH_FRONTOF': 'place in-front-of the red box with your left-hand',
+    'LH_BEHIND': 'place behind the red box with your left-hand',
+    'LH_TOPOF': 'place on-top-of the red box with your left-hand',
+    'LH_NEAR': 'place near the red box with your left-hand',
 
 }
 S_LOOKAT = {
@@ -320,7 +320,7 @@ RC_PLACE = {
         'place', ['to_right_of', 'obj1', 'right_hand']),
     'RH_FRONTOF2': RobotCommand.from_strs(
         'place', ['in_front_of', 'obj1', 'right_hand']),
-    '_RH_BEHIND2': RobotCommand.from_strs(
+    'RH_BEHIND2': RobotCommand.from_strs(
         'place', ['behind', 'obj1', 'right_hand']),
     'RH_TOPOF2': RobotCommand.from_strs(
         'place', ['on_top_of', 'obj1', 'right_hand']),
@@ -872,26 +872,26 @@ class FullOneObjRobotSidePref(unittest.TestCase):
             RC_PLACE[rc_key_short + '_ABOVE'])
         self.assertEqual(
             self.frontend.parse('place next-to the box'),
-            RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
+            RC_PLACE[rc_key_short + '_NEXTTO'])
 
         self.assertEqual(
             self.frontend.parse('place to-the-left-of the box'),
-            RC_PLACE['PL_' + rc_key_short + '_LEFTOF'])
+            RC_PLACE[rc_key_short + '_LEFTOF'])
         self.assertEqual(
             self.frontend.parse('place to-the-right-of the box'),
-            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF'])
+            RC_PLACE[rc_key_short + '_RIGHTOF'])
         self.assertEqual(
             self.frontend.parse('place in-front-of the box'),
-            RC_PLACE['PL_' + rc_key_short + '_FRONTOF'])
+            RC_PLACE[rc_key_short + '_FRONTOF'])
         self.assertEqual(
             self.frontend.parse('place behind the box'),
-            RC_PLACE['PL_' + rc_key_short + '_BEHIND'])
+            RC_PLACE[rc_key_short + '_BEHIND'])
         self.assertEqual(
             self.frontend.parse('place on-top-of the box'),
-            RC_PLACE['PL_' + rc_key_short + '_TOPOF'])
+            RC_PLACE[rc_key_short + '_TOPOF'])
         self.assertEqual(
             self.frontend.parse('place near the box'),
-            RC_PLACE['PL_' + rc_key_short + '_NEAR'])
+            RC_PLACE[rc_key_short + '_NEAR'])
 
 
 class FullRobotOneSidePossible(unittest.TestCase):
@@ -1009,28 +1009,28 @@ class FullObjectOneSidePossible(unittest.TestCase):
         # place
         self.assertEqual(
             self.frontend.parse('place above the red box'),
-            RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
+            RC_PLACE[rc_key_short + '_ABOVE'])
         self.assertEqual(
             self.frontend.parse('place next-to the red box'),
-            RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
+            RC_PLACE[rc_key_short + '_NEXTTO'])
         self.assertEqual(
             self.frontend.parse('place to-the-left-of the box'),
-            RC_PLACE['PL_' + rc_key_short + '_LEFTOF'])
+            RC_PLACE[rc_key_short + '_LEFTOF'])
         self.assertEqual(
             self.frontend.parse('place to-the-right-of the box'),
-            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF'])
+            RC_PLACE[rc_key_short + '_RIGHTOF'])
         self.assertEqual(
             self.frontend.parse('place in-front-of the box'),
-            RC_PLACE['PL_' + rc_key_short + '_FRONTOF'])
+            RC_PLACE[rc_key_short + '_FRONTOF'])
         self.assertEqual(
             self.frontend.parse('place behind the box'),
-            RC_PLACE['PL_' + rc_key_short + '_BEHIND'])
+            RC_PLACE[rc_key_short + '_BEHIND'])
         self.assertEqual(
             self.frontend.parse('place on-top-of the box'),
-            RC_PLACE['PL_' + rc_key_short + '_TOPOF'])
+            RC_PLACE[rc_key_short + '_TOPOF'])
         self.assertEqual(
             self.frontend.parse('place near the box'),
-            RC_PLACE['PL_' + rc_key_short + '_NEAR'])
+            RC_PLACE[rc_key_short + '_NEAR'])
 
 
 class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
@@ -1138,30 +1138,30 @@ class FullObjectPossibleRobotPreferredMismatch(unittest.TestCase):
         # place
         self.assertEqual(
             self.frontend.parse('place above the box with ' + side_req),
-            RC_PLACE['PL_' + rc_key_short + '_ABOVE'])
+            RC_PLACE[rc_key_short + '_ABOVE'])
         self.assertEqual(
             self.frontend.parse('place next-to the box with ' + side_req),
-            RC_PLACE['PL_' + rc_key_short + '_NEXTTO'])
+            RC_PLACE[rc_key_short + '_NEXTTO'])
         self.assertEqual(
             self.frontend.parse(
                 'place to-the-left-of the box with ' + side_req),
-            RC_PLACE['PL_' + rc_key_short + '_LEFTOF'])
+            RC_PLACE[rc_key_short + '_LEFTOF'])
         self.assertEqual(
             self.frontend.parse(
                 'place to-the-right-of the box with ' + side_req),
-            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF'])
+            RC_PLACE[rc_key_short + '_RIGHTOF'])
         self.assertEqual(
             self.frontend.parse('place in-front-of the box with ' + side_req),
-            RC_PLACE['PL_' + rc_key_short + '_FRONTOF'])
+            RC_PLACE[rc_key_short + '_FRONTOF'])
         self.assertEqual(
             self.frontend.parse('place behind the box with ' + side_req),
-            RC_PLACE['PL_' + rc_key_short + '_BEHIND'])
+            RC_PLACE[rc_key_short + '_BEHIND'])
         self.assertEqual(
             self.frontend.parse('place on-top-of the box with ' + side_req),
-            RC_PLACE['PL_' + rc_key_short + '_TOPOF'])
+            RC_PLACE[rc_key_short + '_TOPOF'])
         self.assertEqual(
             self.frontend.parse('place near the box with ' + side_req),
-            RC_PLACE['PL_' + rc_key_short + '_NEAR'])
+            RC_PLACE[rc_key_short + '_NEAR'])
 
 
 class FullMultiObjectsSimple(unittest.TestCase):
@@ -1250,35 +1250,35 @@ class FullMultiObjectsSimple(unittest.TestCase):
         self.assertEqual(
             self.frontend.parse(
                 'place above the ' + desc + ' with ' + hand_str),
-            RC_PLACE['PL_' + rc_key_short + '_ABOVE' + objkey])
+            RC_PLACE[rc_key_short + '_ABOVE' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place next-to the ' + desc + ' with ' + hand_str),
-            RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
+            RC_PLACE[rc_key_short + '_NEXTTO' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place to-the-left-of the ' + desc + ' with ' + hand_str),
-            RC_PLACE['PL_' + rc_key_short + '_LEFTOF' + objkey])
+            RC_PLACE[rc_key_short + '_LEFTOF' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place to-the-right-of the ' + desc + ' with ' + hand_str),
-            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF' + objkey])
+            RC_PLACE[rc_key_short + '_RIGHTOF' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place in-front-of the ' + desc + ' with ' + hand_str),
-            RC_PLACE['PL_' + rc_key_short + '_FRONTOF' + objkey])
+            RC_PLACE[rc_key_short + '_FRONTOF' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place behind the ' + desc + ' with ' + hand_str),
-            RC_PLACE['PL_' + rc_key_short + '_BEHIND' + objkey])
+            RC_PLACE[rc_key_short + '_BEHIND' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place on-top-of the ' + desc + ' with ' + hand_str),
-            RC_PLACE['PL_' + rc_key_short + '_TOPOF' + objkey])
+            RC_PLACE[rc_key_short + '_TOPOF' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place near the ' + desc + ' with ' + hand_str),
-            RC_PLACE['PL_' + rc_key_short + '_NEAR' + objkey])
+            RC_PLACE[rc_key_short + '_NEAR' + objkey])
 
 
 class FullMultiObjectsPickHand(unittest.TestCase):
@@ -1369,34 +1369,34 @@ class FullMultiObjectsPickHand(unittest.TestCase):
         # place
         self.assertEqual(
             self.frontend.parse('place above the ' + desc),
-            RC_PLACE['PL_' + rc_key_short + '_ABOVE' + objkey])
+            RC_PLACE[rc_key_short + '_ABOVE' + objkey])
         self.assertEqual(
             self.frontend.parse('place next-to the ' + desc),
-            RC_PLACE['PL_' + rc_key_short + '_NEXTTO' + objkey])
+            RC_PLACE[rc_key_short + '_NEXTTO' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place to-the-left-of the ' + desc),
-            RC_PLACE['PL_' + rc_key_short + '_LEFTOF' + objkey])
+            RC_PLACE[rc_key_short + '_LEFTOF' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place to-the-right-of the ' + desc),
-            RC_PLACE['PL_' + rc_key_short + '_RIGHTOF' + objkey])
+            RC_PLACE[rc_key_short + '_RIGHTOF' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place in-front-of the ' + desc),
-            RC_PLACE['PL_' + rc_key_short + '_FRONTOF' + objkey])
+            RC_PLACE[rc_key_short + '_FRONTOF' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place behind the ' + desc),
-            RC_PLACE['PL_' + rc_key_short + '_BEHIND' + objkey])
+            RC_PLACE[rc_key_short + '_BEHIND' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place on-top-of the ' + desc),
-            RC_PLACE['PL_' + rc_key_short + '_TOPOF' + objkey])
+            RC_PLACE[rc_key_short + '_TOPOF' + objkey])
         self.assertEqual(
             self.frontend.parse(
                 'place near the ' + desc),
-            RC_PLACE['PL_' + rc_key_short + '_NEAR' + objkey])
+            RC_PLACE[rc_key_short + '_NEAR' + objkey])
 
 
 class FullImpossibleRobotCommands(unittest.TestCase):
