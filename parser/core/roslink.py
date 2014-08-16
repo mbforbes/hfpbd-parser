@@ -137,9 +137,10 @@ class WorldObject(PropertyGetter):
 
             # Strings are probably set, but we can check.
             for op_str in C.op_strs:
-                rwo_val = getattr(rwo, op_str)
-                if len(rwo_val) > 0:
-                    props[op_str] = rwo_val
+                if hasattr(rwo, op_str):
+                    rwo_val = getattr(rwo, op_str)
+                    if len(rwo_val) > 0:
+                        props[op_str] = rwo_val
 
             # Bools are always set, so we can't check.
             for rostype, parsertype in C.m_wo.iteritems():
@@ -148,15 +149,17 @@ class WorldObject(PropertyGetter):
 
             # Bool[] we can check.
             for parsertype, rostype in C.m_op.iteritems():
-                rwo_val = getattr(rwo, rostype)
-                if len(rwo_val) == 2:
-                    props[rostype] = rwo_val
+                if hasattr(rwo, rostype):
+                    rwo_val = getattr(rwo, rostype)
+                    if len(rwo_val) == 2:
+                        props[rostype] = rwo_val
 
             # These are bool[]s that don't require translation.
             for op_boolarr in C.op_boolarrs:
-                rwo_val = getattr(rwo, op_boolarr)
-                if len(rwo_val) == 2:
-                    props[op_boolarr] = rwo_val
+                if hasattr(rwo, op_boolarr):
+                    rwo_val = getattr(rwo, op_boolarr)
+                    if len(rwo_val) == 2:
+                        props[op_boolarr] = rwo_val
 
             wobjs += [WorldObject(props)]
         return wobjs
