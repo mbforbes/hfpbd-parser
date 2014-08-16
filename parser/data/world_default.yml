@@ -22,6 +22,8 @@ objects:
         is_rightmost: false
         is_farthest: false
         is_nearest: false
+        is_tallest: false
+        is_shortest: false
         is_biggest: false
         is_smallest: false
     # -   name: obj1

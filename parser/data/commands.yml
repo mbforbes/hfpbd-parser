@@ -142,6 +142,11 @@ descriptors:
             - farthest
             - nearest
         adjective: true
+    height:
+        options:
+            - tallest
+            - shortest
+        adjective: true
     size:
         options:
             - biggest
@@ -359,6 +364,13 @@ options:
         phrases:
             - nearest
             - closest
+# Height
+    tallest:
+        phrases:
+            - tallest
+    shortest:
+        phrases:
+            - shortest
 # Size
     biggest:
         phrases:

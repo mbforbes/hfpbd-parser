@@ -101,6 +101,8 @@ class C(object):
         'is_farthest': 'farthest',
         'is_nearest': 'nearest',
         # Size
+        'is_tallest': 'tallest',
+        'is_shortest': 'shortest',
         'is_biggest': 'biggest',
         'is_smallest': 'smallest',
     }

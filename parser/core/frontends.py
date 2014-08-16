@@ -166,7 +166,7 @@ class ROSFrontend(Frontend):
                 HandsFreeCommand, WorldObjects, RobotState)
             # TODO(mbforbes); This waits for ROS. This is annoying, but
             # actually may be OK for now.
-            rospy.init_node('hfpbd_parser')
+            rospy.init_node('hfpbd_parser', anonymous=True)
 
             # We get: speech, world objects, robot state.
             rospy.Subscriber('recognizer/output', String, self.sphinx_cb)
