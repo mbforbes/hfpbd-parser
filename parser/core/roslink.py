@@ -333,7 +333,7 @@ class RobotCommand(object):
     read).
     '''
 
-    def __init__(self, name, args):
+    def __init__(self, name, args, phrases):
         '''
         Used internally. Use a factory if you're calling this from
         outside this class.
@@ -344,35 +344,74 @@ class RobotCommand(object):
         '''
         self.name = name
         self.args = args
+        self.phrases = phrases
 
     @staticmethod
-    def from_command(command):
+    def from_command(command, u_sentence):
         '''
         Factory.
 
         Args:
             command (Command)
+            u_sentence (Sentence): What the user said, processed.
 
         Returns:
             RobotCommand
         '''
+        # Get 'core' of command; its unique 'verb.'
+        verb = command.get_name()
+
         # Note that we skip the first option in the list, because this
         # is the name of the command itself.
-        return RobotCommand(command.get_name(), command.opt_str_list()[1:])
+        opt_names = command.opt_str_list()[1:]
+
+        # Get phrases by matching each option with the sentence.
+        u_phrases = u_sentence.get_phrases()
+
+        # Mark phrases as seen.
+        for p in u_phrases:
+            p.seen = True
+
+        # Match w/ options.
+        phrase_strs = []
+        for opt_name, opt in command.option_map.iteritems():
+            # Strategy: return the full option phrase set that has the
+            # highest number of phrase hits. Definitely do one for each
+            # option.
+            opt_phrase_sets = opt.get_phrases()
+            # Just pick first by default, as we want something.
+            best_set, best_set_score = opt_phrase_sets[0], -1
+            for phrase_set in opt_phrase_sets:
+                set_score = 0
+                for phrase in phrase_set:
+                    if phrase.seen:
+                        set_score += phrase.get_score()
+                if set_score > best_set_score:
+                    best_set_score = set_score
+                    best_set = phrase_set
+            # Add best.
+            phrase_strs += [' '.join([str(p) for p in best_set])]
+
+        # Unmark phrases.
+        for p in u_phrases:
+            p.seen = False
+
+        return RobotCommand(verb, opt_names, phrase_strs)
 
     @staticmethod
-    def from_strs(name, args):
+    def from_strs(name, args, phrases=[]):
         '''
         Factory.
 
         Args:
             name (str)
             args ([str])
+            phrases ([str])
 
         Returns:
             RobotCommand
         '''
-        return RobotCommand(name, args)
+        return RobotCommand(name, args, phrases)
 
     def to_rosmsg(self):
         '''
@@ -381,7 +420,8 @@ class RobotCommand(object):
         from pr2_pbd_interaction.msg import HandsFreeCommand
         return HandsFreeCommand(
             cmd=self.name,
-            args=self.args
+            args=self.args,
+            phrases=self.phrases
         )
 
     def __eq__(self, other):
@@ -392,6 +432,9 @@ class RobotCommand(object):
         Returns:
             bool
         '''
+        # NOTE(mbforbes): I think we don't compare phrases, as when
+        # we're checking RobotCommand's we're looking for 'execution'
+        # sameness and not 'lanauge' sameness.
         return self.name == other.name and self.args == other.args
 
     def __ne__(self, other):
@@ -402,7 +445,7 @@ class RobotCommand(object):
         Returns:
             bool
         '''
-        return self.name != other.name or self.args != other.args
+        return not self.__eq__(other)
 
     def __repr__(self):
         '''

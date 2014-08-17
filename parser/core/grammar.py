@@ -255,7 +255,7 @@ class CommandTemplate(object):
             results ([{str: Option}])
 
         Returns:
-            [{str: Option}]
+            [{str: Option}]: Each element is an OrderedDict.
         '''
         if len(todo) == 0:
             return results
@@ -857,7 +857,7 @@ class Sentence(object):
                 if phrase.seen:
                     sentence.score += phrase.get_score()
 
-        # Unmark
+        # Unmark phrases.
         for p in u_phrases:
             p.seen = False
 
@@ -870,7 +870,7 @@ class Phrase(object):
     it is matched in an utterance.
 
     Has state: only briefly, and only during
-    Sentence::compute_score(...).
+    RobotCommand::from_command(...) and Sentence::compute_score(...).
     '''
 
     def __init__(self, words, strategy):

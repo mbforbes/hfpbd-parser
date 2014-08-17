@@ -121,27 +121,58 @@ class Parser(object):
         # Get top command (calculated by Command.cmp).
         self.commands.sort(cmp=Command.cmp)
 
-        # If top two are indistinguishablly close, ask to clarify.
-        first, second = self.commands[0], self.commands[1]
-        # if (Numbers.are_floats_close(first.lang_score, second.lang_score) and
-        #         Numbers.are_floats_close(first.score, second.score)):
-        if (first.lang_score == second.lang_score and
-                first.score == second.score):
-            clarify_args = []
-            # If same template, find non-shared properties to clarify.
-            if first.template == second.template:
-                for k, v in first.option_map.iteritems():
-                    if second.option_map[k] != v:
-                        clarify_args += [k]
-            rc = RobotCommand.from_strs('clarify', clarify_args)
+        # See how many results we got that are top ranked.
+        first_cmd = self.commands[0]
+        top_lscore = first_cmd.lang_score
+        top_cscore = first_cmd.score
+        top_cmds = [
+            c for c in self.commands if
+            c.lang_score == top_lscore and c.score == top_cscore]
+        if len(top_cmds) == 1:
+            # One top command; return it.
+            rc = RobotCommand.from_command(first_cmd, u_sentence)
         else:
-            # Otherwise, we got a solid top result.
-            rc = RobotCommand.from_command(first)
+            # Multiple top commands; ask to clarify.
+            # See if we can be more specific about clarifying.
+            rc = self._get_clarify_rc(top_cmds)
 
         # We return a standard representation of the command.
         self._log_results(rc)
         self.lock.release()
         return rc
+
+    def _get_clarify_rc(self, top_cmds):
+        '''
+        Gets robot command to ask for clarification that is as helpful
+        as possible.
+
+        Prereq: multiple top commands (all equally scoring in lang and
+        score).
+
+        Args:
+            top_cmds ([Command]): Subset of self.commands.
+
+        Returns:
+            RobotCommand: 'Clarify' command, with some number of args,
+                which are options to clarify. If templates don't match,
+                then no args are returned.
+        '''
+        # Check for matching template (i.e. verb).
+        first_template = top_cmds[0].template
+        for cmd in top_cmds:
+            if cmd.template != first_template:
+                # Doesn't match; we need to clarify the basic command.
+                return RobotCommand.from_strs('clarify', [])
+
+        # If we made it here, all top commands have the same template.
+        # Thus, we can look for options to clarify. n^3 computation.
+        clarify_args = set()
+        for cmd1 in top_cmds:
+            for cmd2 in top_cmds:
+                for opt_name, opt_val in cmd1.option_map.iteritems():
+                    if cmd2.option_map[opt_name] != opt_val:
+                        clarify_args.add(opt_name)
+        return RobotCommand.from_strs('clarify', list(clarify_args))
 
     def _log_results(self, rc):
         '''
@@ -173,6 +204,7 @@ class Parser(object):
 
             # For clarity, show what we're returning.
             Info.p('Returning command: %s' % (str(rc)))
+            Info.p('.... with phrases: %s' % (' '.join(rc.phrases)))
 
     def _update_world_internal(self):
         '''
