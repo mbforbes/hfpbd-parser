@@ -117,6 +117,7 @@ parameters:
         - away
     abs_loc:
         - table
+        - there
     rot_dir:
         - cw
         - ccw
@@ -312,6 +313,10 @@ options:
     table:
         phrases:
             - on-the-table
+    there:
+        phrases:
+            - there
+            - right-there
 # rot_dir
     cw:
         phrases:
