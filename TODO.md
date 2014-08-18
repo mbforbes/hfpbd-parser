@@ -17,6 +17,8 @@
 
 - [HIGH] Generate most-likely phrases for all objects in scene (can just use similar machinery as ROS referring phrase service?? No, maybe this is just enumerating all object unique properties (easy, already done in phrase generation for RobotCommand) and deciding which to say (can check out Mike's referred work, may have info on how to do this)).
 
+- [MEDIUM] Be able to quit `hfpw` without a core dump.
+
 - [MEDIUM] Both hands. Probably not for all commands? Think through robot execution first!
 
 - [MEDIUM] More (command) scoring hints:
