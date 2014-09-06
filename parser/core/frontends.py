@@ -52,6 +52,16 @@ class Frontend(object):
         self.parse_buffer = Logger.get_buffer()
         return rc
 
+    def describe(self):
+        '''
+        Describes all objects in the world.
+
+        Returns:
+            {str: [WordOption]}: Map of object names to their
+                description as a list of WordOptions.
+        '''
+        return self.parser.describe()
+
     def get_buffer(self):
         '''
         Returns the buffer from grammar generation as well as the last
@@ -136,6 +146,12 @@ class ROSFrontend(Frontend):
         # And finally return
         return rc
 
+    def describe(self):
+        desc_raw = super(ROSFrontend, self).describe()
+        if self.ros_running:
+            self.desc_pub.publish(self.make_desc_msg(desc_raw))
+        return desc_raw
+
     # New functions ----------------------------------------------------
 
     def startup_ros(self, spin=False):
@@ -163,7 +179,7 @@ class ROSFrontend(Frontend):
             import rospy
             from std_msgs.msg import String
             from pr2_pbd_interaction.msg import (
-                HandsFreeCommand, WorldObjects, RobotState)
+                HandsFreeCommand, WorldObjects, RobotState, Description)
             # TODO(mbforbes); This waits for ROS. This is annoying, but
             # actually may be OK for now.
             rospy.init_node('hfpbd_parser', anonymous=True)
@@ -175,9 +191,11 @@ class ROSFrontend(Frontend):
             rospy.Subscriber(
                 'handsfree_robotstate', RobotState, self.robot_state_cb)
 
-            # We send: parsed commands.
+            # We send: parsed commands, object descriptions.
             self.hfcmd_pub = rospy.Publisher(
                 'handsfree_command', HandsFreeCommand)
+            self.desc_pub = rospy.Publisher(
+                'handsfree_description', Description)
 
             # Setup complete
             self.ros_running = True
@@ -222,6 +240,25 @@ class ROSFrontend(Frontend):
             robot_state (RobotState)
         '''
         self.update_robot(Robot.from_ros(robot_state))
+
+    def make_desc_msg(self, descs):
+        '''
+        Args:
+            descs ({str: [WordOption]}): Map of object names to their
+                description as a list of WordOptions.
+
+        Return:
+            Description: ROS msg.
+        '''
+        names = []
+        descs = []
+        for objname, word_list in descs.iteritems():
+            names += [objname]
+            descs += [' '.join(word.pure_str() for word in word_list)]
+
+        # Construct & return ROS msg.
+        from pr2_pbd_interaction.msg import Description
+        return Description(names, descs)
 
 
 class WebFrontend(ROSFrontend):
@@ -297,6 +334,13 @@ class CLFrontend(ROSFrontend):
             utterance = raw_input('> ')
             Info.p(self.parse(utterance))
 
+    def set_and_describe(self):
+        '''
+        Describes the objects in the (default) world.
+        '''
+        self.set_default_world()
+        Info.p(self.describe())
+
     def print_sentences(self):
         '''Prints all sentences to stdout, one per line.'''
         Debug.printing = False
@@ -347,6 +391,8 @@ class CLFrontend(ROSFrontend):
                 self.print_sentences()
             elif arg == 'ros':
                 self.startup_ros(spin=True)
+            elif arg == 'describe':
+                self.set_and_describe()
             else:
                 Error.p("Unknown option: " + arg)
 

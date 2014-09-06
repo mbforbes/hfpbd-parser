@@ -19,14 +19,39 @@ objects:
         # Relation to other objects. These are only set when there are
         # multiple objects.
         is_leftmost: false
-        is_rightmost: false
+        is_rightmost: true
         is_farthest: false
-        is_nearest: false
+        is_nearest: true
         is_tallest: false
-        is_shortest: false
+        is_shortest: true
         is_biggest: false
+        is_smallest: true
+    -   name: obj1
+        # Relation to arms.
+        is_pickupable: [true, false]
+        is_above_reachable: [false, true]
+        is_nextto_reachable: [true, false]
+        is_leftof_reachable: [false, true]
+        is_rightof_reachable: [true, false]
+        is_frontof_reachable: [true, false]
+        is_behind_reachable: [false, true]
+        is_topof_reachable: [false, false]
+        is_near_reachable: [false, false]
+
+        # E.g. red, blue, green, unknown
+        color: blue
+        # E.g. cup, box, unknown
+        type: box
+        # Relation to other objects. These are only set when there are
+        # multiple objects.
+        is_leftmost: true
+        is_rightmost: false
+        is_farthest: true
+        is_nearest: false
+        is_tallest: true
+        is_shortest: false
+        is_biggest: true
         is_smallest: false
-    # -   name: obj1
 robot:
     # open, closed_empty, has_obj
     gripper_states: [closed_empty, closed_empty]

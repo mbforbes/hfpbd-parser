@@ -33,13 +33,14 @@ __author__ = 'mbforbes'
 ########################################################################
 
 # Builtins
+from collections import Counter
 from operator import attrgetter
 import threading
 import yaml
 
 # Local
 from constants import C, N
-from grammar import CommandDict, Sentence, Command
+from grammar import CommandDict, Sentence, Command, ObjectOption
 from roslink import Robot, WorldObject, RobotCommand
 from util import Error, Info, Debug, Numbers
 
@@ -71,6 +72,10 @@ class Parser(object):
         self.templates = None
         self.commands = None
 
+    ####################################################################
+    # API
+    ####################################################################
+
     def set_world(self, world_objects=None, robot=None):
         '''
         Updates the objects in the world and the robot.
@@ -91,6 +96,77 @@ class Parser(object):
         if self.world_objects is not None and self.robot is not None:
             self._update_world_internal()
         self.lock.release()
+
+    def describe(self):
+        '''
+        Describes the current world objects with a policy.
+
+        The policy is currently hard-coded, but could be parameterized,
+        extended, etc.
+
+        The policy is to use the least words possible to uniquely
+        identify an object with a description. In deciding which words
+        to use, we have a priority ordering over adjectives that is
+        motivated by the literature.
+
+        Returns:
+            {str: [WordOption]}: Map of object names to their
+                description as a list of WordOptions.
+        '''
+        descs = {}
+        obj_opts = [o for o in self.options if isinstance(o, ObjectOption)]
+        # Get flattened list of identities & count occurrences of each.
+        idents = Counter([
+            i for s in
+            [
+                o.structured_word_options[ObjectOption.IDENT] +
+                o.structured_word_options[ObjectOption.TYPE]
+                for o in obj_opts
+            ]
+            for i in s])
+
+        for opt in obj_opts:
+            # Extract to avoid long variable names.
+            swo = opt.structured_word_options
+            starts, uniques, ident, type_ = (
+                opt.structured_word_options[ObjectOption.START],
+                opt.structured_word_options[ObjectOption.UNIQUE],
+                opt.structured_word_options[ObjectOption.IDENT][0],  # Only 1.
+                opt.structured_word_options[ObjectOption.TYPE][0]  # Only 1.
+            )
+            unique_names = [u.name for u in uniques]
+
+            # First add starters.
+            descs[opt.name] = starts
+
+            # See whether type is sufficient.
+            if idents[type_] > 1:
+                # See if there are any adjectives with higher priority
+                # than color.
+                use_color = True
+                for top_adj in C.color_priority:
+                    if top_adj in unique_names:
+                        use_color = False
+
+                # If nothing higher priority than color, and color is
+                # identifying, then use it.
+                if use_color and idents[ident] == 1:
+                    descs[opt.name] += [ident]
+                else:
+                    # Color's not unique or of lower priority; pull from
+                    # the unique list.
+                    # NOTE(mbforbes): Currently just pull first off of
+                    # the list. Change the order by chaning C.m_wo.
+                    if len(uniques) > 0:
+                        descs[opt.name] += [uniques[0]]
+                    # Note that if we don't have any uniques, then we
+                    # have objects that we cannot distinguish. This will
+                    # happen when we have enough objects.
+
+            # Always add type at end.
+            descs[opt.name] += [type_]
+
+        return descs
 
     def parse(self, u):
         '''

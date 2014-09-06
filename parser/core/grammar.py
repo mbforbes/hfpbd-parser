@@ -67,7 +67,6 @@ class CommandDict(object):
                 [Phrase]
                 [Option]
                 [CommandTemplate],
-
             )
         '''
         phrase_map = self._make_phrases()
@@ -674,6 +673,12 @@ class ObjectOption(Option):
     '''Holds options info for object, so can generate all possible
     referring phrases.'''
 
+    # Word option categories
+    START = 'starters (required)'
+    UNIQUE = 'unique adjectives'
+    IDENT = 'identifying (non-unique) adjectives'
+    TYPE = 'type (shape) (required)'
+
     def __init__(self, world_obj, options):
         '''
         Args:
@@ -686,12 +691,16 @@ class ObjectOption(Option):
         '''
         self.name = world_obj.get_property('name')
         self.world_obj = world_obj
-        self.word_options = self._get_word_options(options)
+        self.structured_word_options = (
+            self._get_structured_word_options(options))
+        # Flatten values for list of word options.
+        self.word_options = [
+            i for s in self.structured_word_options.values() for i in s]
         self.phrases = []  # Compute later and cache.
         self.phrases_skipping = []  # Compute later and cache.
         self.opt = False
 
-    def _get_word_options(self, options):
+    def _get_structured_word_options(self, options):
         '''
         Args:
             options ({str: Option}): Map of option name: existing
@@ -701,7 +710,9 @@ class ObjectOption(Option):
                 is pre-computed before objects are sent).
 
         Returns:
-            [WordOption]: The word options that describe this.
+            OrderedDict({ObjectOption.* (str) : [WordOption]}): An
+                ordered map of adjective categories to WordOptions that
+                describe an object.
         '''
         # Here is the ordering use for word options (phrases can appear
         # in any order for utterances, so this only matters for when
@@ -719,24 +730,38 @@ class ObjectOption(Option):
         # - type (box, cup, unknown)
         #
         # First, we add the essential starter ('the').
-        word_options = [options['the']]
+        word_options = OrderedDict()
+        word_options[ObjectOption.START] = [options['the']]
 
         # Next, we do the unique properties (left-most, biggest, etc.)
+        word_options[ObjectOption.UNIQUE] = []
         for object_property, word_option_name in C.m_wo.iteritems():
             # NOTE: The properties are currently bools, so
             # get_property(...) is enough.
             if (self.world_obj.has_property(object_property) and
                     self.world_obj.get_property(object_property)):
                 word_option = options[word_option_name]
-                word_options += [word_option]
+                word_options[ObjectOption.UNIQUE] += [word_option]
 
-        # Now we do non-unique properties (red, box, etc.)
-        props = ['color', 'type']
-        for prop in props:
+        # Next we do non-unique identifying properties (currently:
+        # color).
+        word_options[ObjectOption.IDENT] = []
+        ident_props = ['color']
+        for prop in ident_props:
             if self.world_obj.has_property(prop):
                 prop_val = self.world_obj.get_property(prop)
                 word_option = options[prop_val]
-                word_options += [word_option]
+                word_options[ObjectOption.IDENT] += [word_option]
+
+        # Then we do non-unique identifiying type information
+        # (currently: shape).
+        word_options[ObjectOption.TYPE] = []
+        type_props = ['type']
+        for prop in type_props:
+            if self.world_obj.has_property(prop):
+                prop_val = self.world_obj.get_property(prop)
+                word_option = options[prop_val]
+                word_options[ObjectOption.TYPE] += [word_option]
 
         return word_options
 

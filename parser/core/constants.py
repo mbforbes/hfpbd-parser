@@ -15,6 +15,7 @@ __author__ = 'mbforbes'
 ########################################################################
 
 # Builtins
+from collections import OrderedDict
 import yaml
 
 # Local
@@ -92,20 +93,33 @@ class C(object):
         'away': 'is_away_reachable',
     }
 
+    # This sets where color (the identifying adjective) goes in the
+    # priority list of descriptions.
+    color_priority = [
+        'left_most',
+        'right_most',
+    ]
+
     # Map (M) from object properties to WordOption names (WO).
     # The type of the values for these, when set, are bools.
-    m_wo = {
-        # Location
-        'is_leftmost': 'left_most',
-        'is_rightmost': 'right_most',
-        'is_farthest': 'farthest',
-        'is_nearest': 'nearest',
-        # Size
-        'is_tallest': 'tallest',
-        'is_shortest': 'shortest',
-        'is_biggest': 'biggest',
-        'is_smallest': 'smallest',
-    }
+    # NOTE(mbforbes): The ordering here sets the priority of object
+    # descriptions.
+    m_wo = OrderedDict([
+        ('is_leftmost', 'left_most'),
+        ('is_rightmost', 'right_most'),
+
+        # Color goes here; keep color_priority (above) up-to-date if
+        # this changes.
+
+        ('is_farthest', 'farthest'),
+        ('is_nearest', 'nearest'),
+
+        ('is_biggest', 'biggest'),
+        ('is_smallest', 'smallest'),
+
+        ('is_tallest', 'tallest'),
+        ('is_shortest', 'shortest'),
+    ])
     m_wo_inverse = {v: k for k, v in m_wo.iteritems()}
 
     # Object properties that are referred to by the same name in ROS objects
