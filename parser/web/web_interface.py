@@ -43,10 +43,14 @@ def parse():
         robot_str = frontend.get_robot_str()
 
         if request.method == 'POST':
-            # TODO process
-            data = request.form['inputtext']
-            res = frontend.parse(data)
-            debug = frontend.get_buffer()
+            if request.form['type'] == 'describe':
+                res = frontend.describe()
+                debug = frontend.get_buffer()
+            else:
+                # request.form['type'] == 'parse'
+                data = request.form['inputtext']
+                res = frontend.parse(data)
+                debug = frontend.get_buffer()
             return render_template(
                 'template.html',
                 response=str(res),

@@ -110,11 +110,13 @@ class Parser(object):
         motivated by the literature.
 
         Returns:
-            {str: [WordOption]}: Map of object names to their
+            {str: str}: Map of object names to their
                 description as a list of WordOptions.
         '''
         descs = {}
         obj_opts = [o for o in self.options if isinstance(o, ObjectOption)]
+        Info.p(obj_opts)
+
         # Get flattened list of identities & count occurrences of each.
         idents = Counter([
             i for s in
@@ -126,6 +128,8 @@ class Parser(object):
             for i in s])
 
         for opt in obj_opts:
+            desc = []
+
             # Extract to avoid long variable names.
             swo = opt.structured_word_options
             starts, uniques, ident, type_ = (
@@ -136,8 +140,15 @@ class Parser(object):
             )
             unique_names = [u.name for u in uniques]
 
+            # Debug
+            Info.pl(1, 'swo: ' + str(swo))
+            Info.pl(1, 'starts: ' + str(starts))
+            Info.pl(1, 'uniques: ' + str(uniques))
+            Info.pl(1, 'ident: ' + str(ident))
+            Info.pl(1, 'type: ' + str(type_))
+
             # First add starters.
-            descs[opt.name] = starts
+            desc = starts[:]  # Don't want to modify swo.
 
             # See whether type is sufficient.
             if idents[type_] > 1:
@@ -151,20 +162,23 @@ class Parser(object):
                 # If nothing higher priority than color, and color is
                 # identifying, then use it.
                 if use_color and idents[ident] == 1:
-                    descs[opt.name] += [ident]
+                    desc += [ident]
                 else:
                     # Color's not unique or of lower priority; pull from
                     # the unique list.
                     # NOTE(mbforbes): Currently just pull first off of
                     # the list. Change the order by chaning C.m_wo.
                     if len(uniques) > 0:
-                        descs[opt.name] += [uniques[0]]
+                        desc += [uniques[0]]
                     # Note that if we don't have any uniques, then we
                     # have objects that we cannot distinguish. This will
                     # happen when we have enough objects.
 
             # Always add type at end.
-            descs[opt.name] += [type_]
+            desc += [type_]
+            Info.pl(1, 'result: ' + str(desc))
+            descs[opt.name] = ' '.join(
+                [str(wo.get_phrases()[0][0]) for wo in desc])
 
         return descs
 

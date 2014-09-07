@@ -39,12 +39,30 @@
 					</pre>
 				</div>
 			</div>
+
+			<!-- Util -->
+			<div class="row">
+				<form name="util" method="post">
+					<div class="col-xs-3 col-sm-2 key">
+						util:
+					</div>
+					<div class="col-xs-3 col-sm-2">
+						<input type="hidden" name="type" value="describe" />
+						<input type="submit" value="describe" />
+					</div>
+					<div class="col-xs-6 col-sm-8">
+					</div>
+				</form>
+			</div>
+
+			<!-- Input -->
 			<div class="row">
 				<form name="input" method="post">
 					<div class="col-xs-3 col-sm-2 key">
 						input:
 					</div>
 					<div class="col-xs-6 col-sm-8">
+						<input type="hidden" name="type" value="parse" />
 						<input type="text" class="inputbox" name="inputtext" autofocus />
 					</div>
 					<div class="col-xs-3 col-sm-2">
@@ -52,6 +70,8 @@
 					</div>
 				</form>
 			</div>
+
+			<!-- Response -->
 			<div class="row">
 				<div class="col-xs-3 col-sm-2 key">
 					response:
@@ -60,6 +80,8 @@
 					{{ response }}
 				</div>
 			</div>
+
+			<!-- Debug -->
 			<div class="row">
 				<div class="col-xs-3 col-sm-2 key">
 					debug:

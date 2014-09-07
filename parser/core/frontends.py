@@ -57,10 +57,12 @@ class Frontend(object):
         Describes all objects in the world.
 
         Returns:
-            {str: [WordOption]}: Map of object names to their
-                description as a list of WordOptions.
+            {str: str}: Map of object names to their description as a
+                list of WordOptions.
         '''
-        return self.parser.describe()
+        desc = self.parser.describe()
+        self.parse_buffer = Logger.get_buffer()
+        return desc
 
     def get_buffer(self):
         '''
@@ -241,20 +243,20 @@ class ROSFrontend(Frontend):
         '''
         self.update_robot(Robot.from_ros(robot_state))
 
-    def make_desc_msg(self, descs):
+    def make_desc_msg(self, desc_map):
         '''
         Args:
-            descs ({str: [WordOption]}): Map of object names to their
-                description as a list of WordOptions.
+            descs ({str: str}): Map of object names to their description
+                as a list of WordOptions.
 
         Return:
             Description: ROS msg.
         '''
         names = []
         descs = []
-        for objname, word_list in descs.iteritems():
+        for objname, words in desc_map.iteritems():
             names += [objname]
-            descs += [' '.join(word.pure_str() for word in word_list)]
+            descs += [words]
 
         # Construct & return ROS msg.
         from pr2_pbd_interaction.msg import Description
@@ -392,6 +394,7 @@ class CLFrontend(ROSFrontend):
             elif arg == 'ros':
                 self.startup_ros(spin=True)
             elif arg == 'describe':
+                self.startup_ros(spin=False)
                 self.set_and_describe()
             else:
                 Error.p("Unknown option: " + arg)
