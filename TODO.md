@@ -1,3 +1,6 @@
+# TODO
+
+## Original list
 - [HIGH] Better language scoring function:
 	- Adjective skipping should be free
 	- Should be penalty for other word skipping
