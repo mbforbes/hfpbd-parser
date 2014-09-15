@@ -133,14 +133,15 @@ class Parser(object):
             # Extract to avoid long variable names.
             swo = opt.structured_word_options
             starts, uniques, ident, type_ = (
-                opt.structured_word_options[ObjectOption.START],
-                opt.structured_word_options[ObjectOption.UNIQUE],
-                opt.structured_word_options[ObjectOption.IDENT][0],  # Only 1.
-                opt.structured_word_options[ObjectOption.TYPE][0]  # Only 1.
+                swo[ObjectOption.START],
+                swo[ObjectOption.UNIQUE],
+                swo[ObjectOption.IDENT][0],  # Only 1.
+                swo[ObjectOption.TYPE][0]  # Only 1.
             )
             unique_names = [u.name for u in uniques]
 
             # Debug
+            Info.pl(0, opt)
             Info.pl(1, 'swo: ' + str(swo))
             Info.pl(1, 'starts: ' + str(starts))
             Info.pl(1, 'uniques: ' + str(uniques))
