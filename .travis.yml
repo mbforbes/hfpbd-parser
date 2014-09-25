@@ -5,7 +5,7 @@ install:
     - sudo pip install pep8 coverage python-coveralls PyYAML
 script:
 # Test
-	- coverage run --source=parser.core.grammar,parser.core.hybridbayes,parser.core.matchers,parser.core.roslink parser/tests/test.py
+    - coverage run --source=parser.core.grammar,parser.core.hybridbayes,parser.core.matchers,parser.core.roslink parser/tests/test.py
 after_success:
 # Upload test results
     - coveralls
