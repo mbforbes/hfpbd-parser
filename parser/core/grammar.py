@@ -787,6 +787,8 @@ class ObjectOption(Option):
         Returns:
             [[Phrase]]
         '''
+        # NOTE(mbforbes): We cache each computation so as to only do it
+        # once.
         if skipping:
             if len(self.phrases_skipping) == 0:
                 self.phrases_skipping = Algo.gen_phrases(

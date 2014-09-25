@@ -45,6 +45,15 @@ from roslink import Robot, WorldObject, RobotCommand
 from util import Error, Info, Debug, Numbers
 
 
+# ######################################################################
+# Constants
+# ######################################################################
+
+# How close command scores can be before they are considered equal.
+CSCORE_EPSILON = 0.0001
+
+
+
 ########################################################################
 # Classes
 ########################################################################
@@ -218,7 +227,8 @@ class Parser(object):
         top_cscore = first_cmd.score
         top_cmds = [
             c for c in self.commands if
-            c.lang_score == top_lscore and c.score == top_cscore]
+            Numbers.are_floats_close(c.lang_score, top_lscore) and
+            Numbers.are_floats_close(c.score, top_cscore, CSCORE_EPSILON)]
         if len(top_cmds) == 1:
             # One top command; return it.
             rc = RobotCommand.from_command(first_cmd, u_sentence)
@@ -287,11 +297,12 @@ class Parser(object):
             top_lscore = self.commands[0].lang_score
             top_cscore = self.commands[0].score
             Info.p("Top commands:")
-            for c in self.commands:
-                if c.lang_score == top_lscore and c.score == top_cscore:
-                    Info.pl(1, c)
-                else:
-                    break
+            for c in self.commands[:10]:
+                Info.pl(1, c)
+                # if c.lang_score == top_lscore and c.score == top_cscore:
+                #     Info.pl(1, c)
+                # else:
+                #     break
 
             # For clarity, show what we're returning.
             Info.p('Returning command: %s' % (str(rc)))
