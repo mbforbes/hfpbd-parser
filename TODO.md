@@ -2,6 +2,7 @@
 
 ## Original list
 - [HIGH] Better language scoring function:
+	- NOTE: Step 1 for this is to write breaking tests to be specific about what cases I'm trying to fix.
 	- Adjective skipping should be free
 	- Should be penalty for other word skipping
 	- Should be larger penalty for options whose parameters are matched with another option

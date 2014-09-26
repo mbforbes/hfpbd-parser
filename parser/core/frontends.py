@@ -246,17 +246,17 @@ class ROSFrontend(Frontend):
     def make_desc_msg(self, desc_map):
         '''
         Args:
-            descs ({str: str}): Map of object names to their description
-                as a list of WordOptions.
+            descs ({str: [WordOption]}): Map of object names to their
+                description as a list of WordOptions.
 
         Return:
             Description: ROS msg.
         '''
         names = []
         descs = []
-        for objname, words in desc_map.iteritems():
+        for objname, word_list in desc_map.iteritems():
             names += [objname]
-            descs += [words]
+            descs += [' '.join(word.pure_str() for word in word_list)]
 
         # Construct & return ROS msg.
         from pr2_pbd_interaction.msg import Description
