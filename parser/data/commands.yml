@@ -412,8 +412,8 @@ options:
             - object
     unknown:
         phrases:
-            - thing
             - object
+            - thing
 # These phrases are commonly used in speech, but we don't explicitly
 # model in our commands.
     your:

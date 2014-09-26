@@ -119,8 +119,7 @@ class Parser(object):
         motivated by the literature.
 
         Returns:
-            {str: str}: Map of object names to their
-                description as a list of WordOptions.
+            {str: str}: Map of object names to their description.
         '''
         descs = {}
         obj_opts = [o for o in self.options if isinstance(o, ObjectOption)]
@@ -128,8 +127,7 @@ class Parser(object):
 
         # Get flattened list of identities & count occurrences of each.
         idents = Counter([
-            i for s in
-            [
+            i for s in            [
                 o.structured_word_options[ObjectOption.IDENT] +
                 o.structured_word_options[ObjectOption.TYPE]
                 for o in obj_opts
@@ -190,6 +188,7 @@ class Parser(object):
             descs[opt.name] = ' '.join(
                 [str(wo.get_phrases()[0][0]) for wo in desc])
 
+        Info.pl(0, 'returning: ' + str(descs))
         return descs
 
     def parse(self, u):

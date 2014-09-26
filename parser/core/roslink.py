@@ -13,6 +13,7 @@ import yaml
 
 # Local
 from constants import C
+from grammar import ObjectOption
 from util import Debug, Info, Error, Algo
 
 
@@ -375,6 +376,13 @@ class RobotCommand(object):
         # Match w/ options.
         phrase_strs = []
         for opt_name, opt in command.option_map.iteritems():
+            # For object options, we just return 'object X' and this
+            # gets described dynamically at execution time.
+            if type(opt) == ObjectOption:
+                phrase_strs += [opt.pure_str()]
+                continue
+
+            # The following is for non-object options:
             # Strategy: return the full option phrase set that has the
             # highest number of phrase hits. Definitely do one for each
             # option.

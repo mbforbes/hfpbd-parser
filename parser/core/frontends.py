@@ -57,8 +57,7 @@ class Frontend(object):
         Describes all objects in the world.
 
         Returns:
-            {str: str}: Map of object names to their description as a
-                list of WordOptions.
+            {str: str}: Map of object names to their description.
         '''
         desc = self.parser.describe()
         self.parse_buffer = Logger.get_buffer()
@@ -122,6 +121,7 @@ class Frontend(object):
             robot ([Robot])
         '''
         self.parser.set_world(world_objects, robot)
+        self.describe()
         self.start_buffer = Logger.get_buffer()
 
 
@@ -140,6 +140,11 @@ class ROSFrontend(Frontend):
     def parse(self, utterance):
         # Parse as normal
         rc = super(ROSFrontend, self).parse(utterance)
+
+        # Describe (first because we kind of have a race condition and
+        # this is easier than rewriting everything as services and will
+        # probably work).
+        self.describe()
 
         # Maybe publish to ROS!
         if self.ros_running and self.hfcmd_pub is not None:
@@ -254,9 +259,9 @@ class ROSFrontend(Frontend):
         '''
         names = []
         descs = []
-        for objname, word_list in desc_map.iteritems():
+        for objname, desc in desc_map.iteritems():
             names += [objname]
-            descs += [' '.join(word.pure_str() for word in word_list)]
+            descs += [desc]
 
         # Construct & return ROS msg.
         from pr2_pbd_interaction.msg import Description
@@ -281,11 +286,11 @@ class WebFrontend(ROSFrontend):
         Returns:
             str
         '''
-        ret = ''
+        ret = []
         if self.parser.world_objects is not None:
             for obj in self.parser.world_objects:
-                ret += obj.to_dict_str()
-        return ret
+                ret += [obj.to_dict_str()]
+        return ('-'*40 + '\n').join(ret)
 
     def get_robot_str(self):
         '''

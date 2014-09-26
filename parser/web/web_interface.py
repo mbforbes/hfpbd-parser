@@ -20,15 +20,11 @@ from flask import Flask, render_template, request
 from parser.core.frontends import WebFrontend
 
 ########################################################################
-# Main (execution starts here)
+# Globals
 ########################################################################
 
 app = Flask(__name__)
-
-# Make parser frontend, enabling ROS if possible.
-frontend = WebFrontend()
-if not frontend.startup_ros(spin=False):
-    frontend.set_default_world()
+frontend = None
 
 
 @app.route('/style.css')
@@ -68,5 +64,22 @@ def parse():
     except:
         print traceback.format_exc()
 
-if __name__ == '__main__':
+
+def main(args=[]):
+    # Check args
+    useros = len(args) == 0 or args[0] != 'noros'
+
+    # Make parser frontend, enabling ROS if desired.
+    global frontend
+    frontend = WebFrontend()
+    if useros:
+        frontend.startup_ros(spin=False)
+    else:
+        frontend.set_default_world()
+
+    # Serve
     app.run(debug=True)
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
