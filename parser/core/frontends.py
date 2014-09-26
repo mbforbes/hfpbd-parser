@@ -52,15 +52,20 @@ class Frontend(object):
         self.parse_buffer = Logger.get_buffer()
         return rc
 
-    def describe(self):
+    def describe(self, grab_buffer=True):
         '''
         Describes all objects in the world.
+
+        Args:
+            grab_buffer (bool, optional): Whether to grab the log buffer
+                and save it as self.parse_buffer. Defaults to True.
 
         Returns:
             {str: str}: Map of object names to their description.
         '''
         desc = self.parser.describe()
-        self.parse_buffer = Logger.get_buffer()
+        if grab_buffer:
+            self.parse_buffer = Logger.get_buffer()
         return desc
 
     def get_buffer(self):
@@ -121,7 +126,7 @@ class Frontend(object):
             robot ([Robot])
         '''
         self.parser.set_world(world_objects, robot)
-        self.describe()
+        self.describe(grab_buffer=False)
         self.start_buffer = Logger.get_buffer()
 
 
@@ -144,7 +149,7 @@ class ROSFrontend(Frontend):
         # Describe (first because we kind of have a race condition and
         # this is easier than rewriting everything as services and will
         # probably work).
-        self.describe()
+        self.describe(grab_buffer=False)
 
         # Maybe publish to ROS!
         if self.ros_running and self.hfcmd_pub is not None:
@@ -153,8 +158,8 @@ class ROSFrontend(Frontend):
         # And finally return
         return rc
 
-    def describe(self):
-        desc_raw = super(ROSFrontend, self).describe()
+    def describe(self, grab_buffer=True):
+        desc_raw = super(ROSFrontend, self).describe(grab_buffer)
         if self.ros_running:
             self.desc_pub.publish(self.make_desc_msg(desc_raw))
         return desc_raw

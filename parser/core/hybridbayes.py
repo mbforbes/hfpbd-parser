@@ -50,7 +50,7 @@ from util import Error, Info, Debug, Numbers
 # ######################################################################
 
 # How close command scores can be before they are considered equal.
-CSCORE_EPSILON = 0.0001
+CSCORE_EPSILON = 0.00001
 
 
 
