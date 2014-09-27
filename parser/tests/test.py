@@ -859,7 +859,7 @@ class FullOneObjNoRobot(unittest.TestCase):
                 for key, cmd in str_items:
                     query = ' '.join([prefix, cmd, postfix])
                     expected_rc = all_rcs[key]
-                    actual_rc = self.frontend.parse(query)[0]
+                    actual_rc = self.frontend.parse(query)
                     self.assertEqual(expected_rc, actual_rc)
 
     def test_obj_desc(self):
