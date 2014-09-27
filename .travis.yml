@@ -3,6 +3,7 @@ python:
     - "2.7"
 install:
     - sudo pip install pep8 coverage python-coveralls PyYAML
+    - export PYTHONPATH=`pwd`:$PYTHONPATH
 script:
 # Test
 # Travis is having trouble with coverage. Just running tests.
