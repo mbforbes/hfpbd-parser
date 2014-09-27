@@ -2,14 +2,11 @@ language: python
 python:
     - "2.7"
 install:
-    - sudo pip install pep8 coverage python-coveralls PyYAML
+    - pip install pep8 coverage python-coveralls PyYAML
     - export PYTHONPATH=`pwd`:$PYTHONPATH
 script:
 # Test
-# Travis is having trouble with coverage. Just running tests.
-#    - coverage run --source=parser.core.grammar,parser.core.hybridbayes,parser.core.matchers,parser.core.roslink parser/tests/test.py
-    - python parser/tests/test.py
+    - coverage run --source=parser.core.grammar,parser.core.hybridbayes,parser.core.matchers,parser.core.roslink parser/tests/test.py
 after_success:
 # Upload test results
-# Travis is having trouble with coverage. Just running tests.
-#    - coveralls
+    - coveralls
