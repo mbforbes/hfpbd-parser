@@ -393,7 +393,7 @@ class RobotCommand(object):
                 set_score = 0
                 for phrase in phrase_set:
                     if phrase.seen:
-                        set_score += phrase.get_score()
+                        set_score += phrase.get_match_score()
                 if set_score > best_set_score:
                     best_set_score = set_score
                     best_set = phrase_set

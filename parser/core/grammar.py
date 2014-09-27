@@ -50,11 +50,16 @@ class CommandDict(object):
         CommandDict.longest_cmd_name_len = max(
             [len(cmd) for cmd, params in self.ydict['commands'].iteritems()])
 
-        # Make all adjectives in object option descriptors optional.
+        # Programmatically modify the commands.yaml file.
         for desc_type, props in ydict['descriptors'].iteritems():
             if 'adjective' in props and props['adjective']:
                 for option in props['options']:
+                    # We make the option optional (meaning that it can
+                    # be skipped when generating phrases).
                     ydict['options'][option]['optional'] = True
+                    # We also give it the 'adj' (adjective) matching
+                    # strategy, which makes it important when grounding.
+                    ydict['options'][option]['strategy'] = 'adj'
 
     def get_grammar(self, wobjs):
         '''
@@ -784,6 +789,12 @@ class ObjectOption(Option):
         Returns a list of possible phrases, where each element is a list
         of Phrases.
 
+        Args:
+            skipping (bool, optional): Whether to allow word-skipping
+                (for adjectives). This is useful for exhaustively
+                generating all possible referring phrases for an object.
+                Defaults to False.
+
         Returns:
             [[Phrase]]
         '''
@@ -865,11 +876,15 @@ class Sentence(object):
         return self.phrases
 
     @staticmethod
-    def compute_score(sentences, u_sentence):
+    def compute_score(sentences, u_sentence, normalize=True, ground=False):
         '''
         Args:
             sentences ([Sentence]): Sentences to score.
             u_sentence (Sentence): The utterance as a Sentence.
+            normalize (bool, optional): Whether to normalize the scores
+                of sentences after finishing. Defaults to True.
+            ground (bool, optional): Whether we are parsing (False) or
+                grounding (True). Defaults to False (parsing).
         '''
         u_phrases = u_sentence.get_phrases()
 
@@ -882,14 +897,18 @@ class Sentence(object):
             sentence.score = 0.0
             for phrase in sentence.phrases:
                 if phrase.seen:
-                    sentence.score += phrase.get_score()
+                    if ground:
+                        sentence.score += phrase.get_ground_score()
+                    else:
+                        sentence.score += phrase.get_match_score()
 
         # Unmark phrases.
         for p in u_phrases:
             p.seen = False
 
         # Normalize
-        Numbers.make_prob(sentences)
+        if normalize:
+            Numbers.make_prob(sentences)
 
 
 class Phrase(object):
@@ -908,17 +927,25 @@ class Phrase(object):
         '''
         self.words = words
         self.strategy = strategy
-        self.score = strategy.score()
+        self.match_score = strategy.get_match_score()
+        self.ground_score = strategy.get_ground_score()
 
         # Mark when seen by an utterance.
         self.seen = False
 
-    def get_score(self):
+    def get_match_score(self):
         '''
         Returns:
             float
         '''
-        return self.score
+        return self.match_score
+
+    def get_ground_score(self):
+        '''
+        Returns:
+            float
+        '''
+        return self.ground_score
 
     def found_in(self, utterance):
         '''

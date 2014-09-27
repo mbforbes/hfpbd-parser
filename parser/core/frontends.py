@@ -68,6 +68,20 @@ class Frontend(object):
             self.parse_buffer = Logger.get_buffer()
         return desc
 
+    def ground(self, grounding_query):
+        '''
+        Grounds the provided expression with probabilities over objs.
+
+        Args:
+            grounding_query (str)
+
+        Returns:
+            {str: float}: Map of obj : P(obj).
+        '''
+        gprobs = self.parser.ground(grounding_query)
+        self.parse_buffer = Logger.get_buffer()
+        return gprobs
+
     def get_buffer(self):
         '''
         Returns the buffer from grammar generation as well as the last
@@ -330,7 +344,7 @@ class CLFrontend(ROSFrontend):
         Answers queries using no world objects and no robot state.
         '''
         self.set_world()
-        self.interactive_loop()
+        self._interactive_loop()
 
     def default_interactive_loop(self):
         '''
@@ -338,16 +352,34 @@ class CLFrontend(ROSFrontend):
         '''
         # Provide initial world, robot
         self.set_default_world()
-        self.interactive_loop()
+        self._interactive_loop()
 
-    def interactive_loop(self):
+    def _interactive_loop(self):
         '''
         Answers queries using the already-set world objects and robot
         state.
         '''
         while True:
-            utterance = raw_input('> ')
+            utterance = raw_input('u> ')
             Info.p(self.parse(utterance))
+
+    def default_grounding_loop(self):
+        '''
+        Resolves grounding queries using file-saved world objects and
+        robot state.
+        '''
+        # Provide initial world, robot
+        self.set_default_world()
+        self._grounding_loop()
+
+    def _grounding_loop(self):
+        '''
+        Resolves grounding queries using the already-set world objects
+        and robot state.
+        '''
+        while True:
+            grounding_query = raw_input('?> ')
+            Info.p(self.ground(grounding_query))
 
     def set_and_describe(self):
         '''
@@ -409,6 +441,8 @@ class CLFrontend(ROSFrontend):
             elif arg == 'describe':
                 self.startup_ros(spin=False)
                 self.set_and_describe()
+            elif arg == 'ground':
+                self.default_grounding_loop()
             else:
                 Error.p("Unknown option: " + arg)
 

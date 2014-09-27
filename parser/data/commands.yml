@@ -403,13 +403,14 @@ options:
         phrases:
             - box
             - cube
-            - thing
-            - object
+        strategy: noun
     cup:
         phrases:
             - cup
-            - thing
-            - object
+        strategy: noun
+    # NOTE(mbforbes): Unknown object options are technically nouns, but
+    # they aren't matched with the noun strategy because they don't
+    # provide any additional evidence to the grounding.
     unknown:
         phrases:
             - object

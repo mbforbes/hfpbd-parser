@@ -52,6 +52,11 @@ from util import Error, Info, Debug, Numbers
 # How close command scores can be before they are considered equal.
 CSCORE_EPSILON = 0.00001
 
+# Smoothing over grounding; objects with no matching phrase in the
+# referring expression get this score. This should be balanced with
+# the numbers in matchers.py. Note that this is a score and not a
+# probability.
+GROUND_BASE_SCORE = 0.2
 
 
 ########################################################################
@@ -121,13 +126,14 @@ class Parser(object):
         Returns:
             {str: str}: Map of object names to their description.
         '''
+        self.lock.acquire()
         descs = {}
         obj_opts = [o for o in self.options if isinstance(o, ObjectOption)]
         Info.p(obj_opts)
 
         # Get flattened list of identities & count occurrences of each.
         idents = Counter([
-            i for s in            [
+            i for s in [
                 o.structured_word_options[ObjectOption.IDENT] +
                 o.structured_word_options[ObjectOption.TYPE]
                 for o in obj_opts
@@ -189,6 +195,7 @@ class Parser(object):
                 [str(wo.get_phrases()[0][0]) for wo in desc])
 
         Info.pl(0, 'returning: ' + str(descs))
+        self.lock.release()
         return descs
 
     def parse(self, u):
@@ -240,6 +247,41 @@ class Parser(object):
         self._log_results(rc)
         self.lock.release()
         return rc
+
+    def ground(self, gq):
+        '''
+        Args:
+            gq (str): Grounding query.
+
+        Returns:
+            {str: float}: Map of obj : P(obj).
+        '''
+        self.lock.acquire()
+
+        res = {}
+        gq_sentence = Sentence([p for p in self.phrases if p.found_in(gq)])
+        opts = [o for o in self.options if isinstance(o, ObjectOption)]
+        scores = []
+        for o in opts:
+            phrase_sets = o.get_phrases()
+            sentences = [Sentence(phrases) for phrases in phrase_sets]
+            # Match with grounding scores for phrases.
+            Sentence.compute_score(
+                sentences,
+                gq_sentence,
+                normalize=False,
+                ground=True
+            )
+            best_score = max([s.score for s in sentences])
+            scores += [best_score]
+
+        # Normalize to valid probability distribution and save.
+        scores = Numbers.normalize_list(scores, GROUND_BASE_SCORE)
+        for i in range(len(scores)):
+            res[opts[i].name] = scores[i]
+
+        self.lock.release()
+        return res
 
     def _get_clarify_rc(self, top_cmds):
         '''
