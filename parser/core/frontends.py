@@ -126,7 +126,10 @@ class Frontend(object):
             robot ([Robot])
         '''
         self.parser.set_world(world_objects, robot)
-        self.describe(grab_buffer=False)
+        # parser::self.options is None if called here in tests. This is
+        # weird, but calling here is hacky anyway. Maybe investigate
+        # later.
+        # self.describe(grab_buffer=False)
         self.start_buffer = Logger.get_buffer()
 
 
