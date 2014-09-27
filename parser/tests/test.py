@@ -831,37 +831,6 @@ class FullOneObjNoRobot(unittest.TestCase):
             self.frontend.parse('raise right-gripper'),
             RC_MOVEABS['RH_UP'])
 
-    @unittest.skipIf(
-        not TestUtil.on_travis(),
-        "Test is slow and more of sanity check; OK to run only on Travis.")
-    def test_extra_words(self):
-        # Collect all strs
-        all_strs = {}
-        str_items = (
-            S_OPEN_CLOSE.items() + S_MOVEABS.items() + S_MOVEREL.items() +
-            S_PICKUP.items() + S_PLACE.items() + S_LOOKAT.items())
-        for name, words in str_items:
-            all_strs[name] = words
-
-        # Collect all RCs
-        all_rcs = {}
-        rc_items = (
-            RC_OPEN_CLOSE.items() + RC_MOVEABS.items() + RC_MOVEREL.items() +
-            RC_PICKUP.items() + RC_PLACE.items() + RC_LOOKAT.items())
-        for name, rc in rc_items:
-            all_rcs[name] = rc
-
-        prefixes = ['Hey rosie', 'Robot, could you', 'Please']
-        postfixes = ['thanks.', 'or else.', 'yeah, that would be great.']
-
-        for prefix in prefixes:
-            for postfix in postfixes:
-                for key, cmd in str_items:
-                    query = ' '.join([prefix, cmd, postfix])
-                    expected_rc = all_rcs[key]
-                    actual_rc = self.frontend.parse(query)
-                    self.assertEqual(expected_rc, actual_rc)
-
     def test_obj_desc(self):
         self.assertEqual(
             self.frontend.parse('pick-up that thing left-hand'),
