@@ -1,29 +1,16 @@
 # TODO
 
-## Original list
+## Optimizations
 - [HIGH] Better language scoring function:
 	- NOTE: Step 1 for this is to write breaking tests to be specific about what cases I'm trying to fix.
 	- Adjective skipping should be free
 	- Should be penalty for other word skipping
 	- Should be larger penalty for options whose parameters are matched with another option
 
-- [HIGH] ROS service to resolve a referring phrase.
-
-- [HIGH] A 'turn hand' (or something) command to have hand face a certain direction.
-
-- [HIGH] Movement parameters (e.g. a little).
-
-- [HIGH] Record objects command.
-
 - [HIGH] Defaults for:
-	- Movement parameters
 	- Rotation direction (CW vs CCW)
 
-- [HIGH] Generate most-likely phrases for all objects in scene (can just use similar machinery as ROS referring phrase service?? No, maybe this is just enumerating all object unique properties (easy, already done in phrase generation for RobotCommand) and deciding which to say (can check out Mike's referred work, may have info on how to do this)).
-
 - [MEDIUM] Be able to quit `hfpw` without a core dump.
-
-- [MEDIUM] Both hands. Probably not for all commands? Think through robot execution first!
 
 - [MEDIUM] More (command) scoring hints:
 	- Add action info to robot state.
