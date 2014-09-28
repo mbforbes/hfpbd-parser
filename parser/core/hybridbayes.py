@@ -280,6 +280,11 @@ class Parser(object):
         for i in range(len(scores)):
             res[opts[i].name] = scores[i]
 
+        # Log for convenience
+        Info.p("Grounding for query: " + gq)
+        for obj, prob in res.iteritems():
+            Info.pl(1, obj + ": " + str(prob))
+
         self.lock.release()
         return res
 

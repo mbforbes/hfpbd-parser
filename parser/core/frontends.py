@@ -153,18 +153,27 @@ class ROSFrontend(Frontend):
 
         # Initialize (for clarify)
         self.hfcmd_pub = None
+        self.hfgrounding_pub = None
         self.ros_running = False
 
     def parse(self, utterance):
         # Parse as normal
         rc = super(ROSFrontend, self).parse(utterance)
 
-        # Maybe publish to ROS!
+        # Maybe publish to ROS.
         if self.ros_running and self.hfcmd_pub is not None:
             self.hfcmd_pub.publish(rc.to_rosmsg())
 
         # And finally return
         return rc
+
+    def ground(self, grounding_query):
+        # Ground as normal
+        res = super(ROSFrontend, self).ground(grounding_query)
+
+        # Maybe publish to ROS.
+        if self.ros_running and self.hfgrounding_pub is not None:
+            self.hfgrounding_pub.publish(self.make_grounding_msg(res))
 
     # New functions ----------------------------------------------------
 
@@ -193,7 +202,8 @@ class ROSFrontend(Frontend):
             import rospy
             from std_msgs.msg import String
             from pr2_pbd_interaction.msg import (
-                HandsFreeCommand, WorldObjects, RobotState, Description)
+                HandsFreeCommand, WorldObjects, RobotState, Description,
+                HandsFreeGrounding)
             from pr2_pbd_interaction.srv import WorldChange
             # TODO(mbforbes); This waits for ROS. This is annoying, but
             # actually may be OK for now.
@@ -204,9 +214,11 @@ class ROSFrontend(Frontend):
             rospy.Subscriber(
                 'handsfree_robotstate', RobotState, self.robot_state_cb)
 
-            # We send: parsed commands.
+            # We send: parsed commands, grounding results.
             self.hfcmd_pub = rospy.Publisher(
                 'handsfree_command', HandsFreeCommand)
+            self.hfgrounding_pub = rospy.Publisher(
+                'handsfree_grounding', HandsFreeGrounding)
 
             # We provide: descriptions for objects.
             rospy.Service(
@@ -260,6 +272,26 @@ class ROSFrontend(Frontend):
             robot_state (RobotState)
         '''
         self.update_robot(Robot.from_ros(robot_state))
+
+    def make_grounding_msg(self, raw_ground, query):
+        '''
+        Args:
+            raw_ground ({str: float}): Result of calling ground(...) on
+                query.
+            query (str): The original grounding query.
+
+        Returns:
+            HandsFreeGrounding: ROS msg.
+        '''
+        names = []
+        probs = []
+        for objname, prob in raw_ground.iteritems():
+            names += [objname]
+            probs += [prob]
+
+        # Construct & return ROS msg.
+        from pr2_pbd_interaction.msg import HandsFreeGrounding
+        return HandsFreeGrounding(names, probs, query)
 
     def make_desc_msg(self, desc_map):
         '''
