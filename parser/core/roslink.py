@@ -334,7 +334,7 @@ class RobotCommand(object):
     read).
     '''
 
-    def __init__(self, name, args, phrases):
+    def __init__(self, name, args, phrases, utterance):
         '''
         Used internally. Use a factory if you're calling this from
         outside this class.
@@ -342,19 +342,23 @@ class RobotCommand(object):
         Args:
             name (str)
             args ([str])
+            phrases ([str])
+            utterance (str)
         '''
         self.name = name
         self.args = args
         self.phrases = phrases
+        self.utterance = utterance
 
     @staticmethod
-    def from_command(command, u_sentence):
+    def from_command(command, u_sentence, u):
         '''
         Factory.
 
         Args:
             command (Command)
             u_sentence (Sentence): What the user said, processed.
+            u (str): Utterance: what the user said.
 
         Returns:
             RobotCommand
@@ -404,10 +408,10 @@ class RobotCommand(object):
         for p in u_phrases:
             p.seen = False
 
-        return RobotCommand(verb, opt_names, phrase_strs)
+        return RobotCommand(verb, opt_names, phrase_strs, u)
 
     @staticmethod
-    def from_strs(name, args, phrases=[]):
+    def from_strs(name, args, phrases=[], utterance=''):
         '''
         Factory.
 
@@ -415,11 +419,12 @@ class RobotCommand(object):
             name (str)
             args ([str])
             phrases ([str])
+            utterance (str)
 
         Returns:
             RobotCommand
         '''
-        return RobotCommand(name, args, phrases)
+        return RobotCommand(name, args, phrases, utterance)
 
     def to_rosmsg(self):
         '''
@@ -429,7 +434,8 @@ class RobotCommand(object):
         return HandsFreeCommand(
             cmd=self.name,
             args=self.args,
-            phrases=self.phrases
+            phrases=self.phrases,
+            utterance=self.utterance
         )
 
     def __eq__(self, other):

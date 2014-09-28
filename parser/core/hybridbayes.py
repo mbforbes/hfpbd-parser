@@ -237,11 +237,11 @@ class Parser(object):
             Numbers.are_floats_close(c.score, top_cscore, CSCORE_EPSILON)]
         if len(top_cmds) == 1:
             # One top command; return it.
-            rc = RobotCommand.from_command(first_cmd, u_sentence)
+            rc = RobotCommand.from_command(first_cmd, u_sentence, u)
         else:
             # Multiple top commands; ask to clarify.
             # See if we can be more specific about clarifying.
-            rc = self._get_clarify_rc(top_cmds)
+            rc = self._get_clarify_rc(top_cmds, u)
 
         # We return a standard representation of the command.
         self._log_results(rc)
@@ -283,7 +283,7 @@ class Parser(object):
         self.lock.release()
         return res
 
-    def _get_clarify_rc(self, top_cmds):
+    def _get_clarify_rc(self, top_cmds, u):
         '''
         Gets robot command to ask for clarification that is as helpful
         as possible.
@@ -293,6 +293,7 @@ class Parser(object):
 
         Args:
             top_cmds ([Command]): Subset of self.commands.
+            u (str): Utterance: what we heard the user say.
 
         Returns:
             RobotCommand: 'Clarify' command, with some number of args,
@@ -304,7 +305,7 @@ class Parser(object):
         for cmd in top_cmds:
             if cmd.template != first_template:
                 # Doesn't match; we need to clarify the basic command.
-                return RobotCommand.from_strs('clarify', [])
+                return RobotCommand.from_strs('clarify', [], [], u)
 
         # If we made it here, all top commands have the same template.
         # Thus, we can look for options to clarify. n^3 computation.
@@ -314,7 +315,7 @@ class Parser(object):
                 for opt_name, opt_val in cmd1.option_map.iteritems():
                     if cmd2.option_map[opt_name] != opt_val:
                         clarify_args.add(opt_name)
-        return RobotCommand.from_strs('clarify', list(clarify_args))
+        return RobotCommand.from_strs('clarify', list(clarify_args), [], u)
 
     def _log_results(self, rc):
         '''
