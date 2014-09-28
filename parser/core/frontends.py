@@ -194,8 +194,7 @@ class ROSFrontend(Frontend):
             from std_msgs.msg import String
             from pr2_pbd_interaction.msg import (
                 HandsFreeCommand, WorldObjects, RobotState, Description)
-            from pr2_pbd_interaction.srv import (
-                WorldChange, WorldChangeRequest, WorldChangeResponse)
+            from pr2_pbd_interaction.srv import WorldChange
             # TODO(mbforbes); This waits for ROS. This is annoying, but
             # actually may be OK for now.
             rospy.init_node('hfpbd_parser', anonymous=True)
@@ -249,7 +248,8 @@ class ROSFrontend(Frontend):
         Returns:
             WorldChangeResponse
         '''
-        self.update_objects(WorldObject.from_ros(req.wo.world_objects))
+        from pr2_pbd_interaction.srv import WorldChangeResponse
+        self.update_objects(WorldObject.from_ros(req.wo))
         return WorldChangeResponse(self.make_desc_msg(self.describe(False)))
 
     def robot_state_cb(self, robot_state):
