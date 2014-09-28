@@ -78,7 +78,7 @@ def main(args=[]):
         frontend.set_default_world()
 
     # Serve
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
 
 
 if __name__ == '__main__':

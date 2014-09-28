@@ -140,10 +140,6 @@ class Frontend(object):
             robot ([Robot])
         '''
         self.parser.set_world(world_objects, robot)
-        # parser::self.options is None if called here in tests. This is
-        # weird, but calling here is hacky anyway. Maybe investigate
-        # later.
-        # self.describe(grab_buffer=False)
         self.start_buffer = Logger.get_buffer()
 
 
@@ -163,23 +159,12 @@ class ROSFrontend(Frontend):
         # Parse as normal
         rc = super(ROSFrontend, self).parse(utterance)
 
-        # Describe (first because we kind of have a race condition and
-        # this is easier than rewriting everything as services and will
-        # probably work).
-        self.describe(grab_buffer=False)
-
         # Maybe publish to ROS!
         if self.ros_running and self.hfcmd_pub is not None:
             self.hfcmd_pub.publish(rc.to_rosmsg())
 
         # And finally return
         return rc
-
-    def describe(self, grab_buffer=True):
-        desc_raw = super(ROSFrontend, self).describe(grab_buffer)
-        if self.ros_running:
-            self.desc_pub.publish(self.make_desc_msg(desc_raw))
-        return desc_raw
 
     # New functions ----------------------------------------------------
 
@@ -209,6 +194,8 @@ class ROSFrontend(Frontend):
             from std_msgs.msg import String
             from pr2_pbd_interaction.msg import (
                 HandsFreeCommand, WorldObjects, RobotState, Description)
+            from pr2_pbd_interaction.srv import (
+                WorldChange, WorldChangeRequest, WorldChangeResponse)
             # TODO(mbforbes); This waits for ROS. This is annoying, but
             # actually may be OK for now.
             rospy.init_node('hfpbd_parser', anonymous=True)
@@ -216,15 +203,15 @@ class ROSFrontend(Frontend):
             # We get: speech, world objects, robot state.
             rospy.Subscriber('recognizer/output', String, self.sphinx_cb)
             rospy.Subscriber(
-                'handsfree_worldobjects', WorldObjects, self.world_objects_cb)
-            rospy.Subscriber(
                 'handsfree_robotstate', RobotState, self.robot_state_cb)
 
-            # We send: parsed commands, object descriptions.
+            # We send: parsed commands.
             self.hfcmd_pub = rospy.Publisher(
                 'handsfree_command', HandsFreeCommand)
-            self.desc_pub = rospy.Publisher(
-                'handsfree_description', Description)
+
+            # We provide: descriptions for objects.
+            rospy.Service(
+                'handsfree_worldchange', WorldChange, self.handle_world_change)
 
             # Setup complete
             self.ros_running = True
@@ -252,14 +239,18 @@ class ROSFrontend(Frontend):
         # Parse; ROS response happens in parser automatically.
         self.parse(recog_str)
 
-    def world_objects_cb(self, world_objects):
+    def handle_world_change(self, req):
         '''ROS-specific: Callback for when world objects are received
         from the robot.
 
         Args:
-            world_objects (WorldObjects)
+            req (WorldChangeRequest)
+
+        Returns:
+            WorldChangeResponse
         '''
-        self.update_objects(WorldObject.from_ros(world_objects))
+        self.update_objects(WorldObject.from_ros(req.wo.world_objects))
+        return WorldChangeResponse(self.make_desc_msg(self.describe(False)))
 
     def robot_state_cb(self, robot_state):
         '''ROS-specific: Callback for when robot state is received from
