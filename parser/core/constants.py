@@ -94,10 +94,18 @@ class C(object):
     }
 
     # This sets where color (the identifying adjective) goes in the
-    # priority list of descriptions.
+    # priority list of descriptions. List all adjective properties
+    # here that go BEFORE color.
     color_priority = [
         'left_most',
         'right_most',
+        'middle',
+        'farthest',
+        'nearest',
+        'biggest',
+        'smallest',
+        'tallest',
+        'shortest',
     ]
 
     # Map (M) from object properties to WordOption names (WO).
@@ -108,8 +116,7 @@ class C(object):
         ('is_leftmost', 'left_most'),
         ('is_rightmost', 'right_most'),
 
-        # Color goes here; keep color_priority (above) up-to-date if
-        # this changes.
+        ('is_middle', 'middle'),
 
         ('is_farthest', 'farthest'),
         ('is_nearest', 'nearest'),
@@ -119,6 +126,9 @@ class C(object):
 
         ('is_tallest', 'tallest'),
         ('is_shortest', 'shortest'),
+
+        # Color goes here; keep color_priority (above) up-to-date if
+        # this changes.
     ])
     m_wo_inverse = {v: k for k, v in m_wo.iteritems()}
 

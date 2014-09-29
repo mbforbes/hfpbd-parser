@@ -138,6 +138,10 @@ descriptors:
             - left_most
             - right_most
         adjective: true
+    mid:
+        options:
+            - middle
+        adjective: true
     far:
         options:
             - farthest
@@ -369,6 +373,9 @@ options:
         phrases:
             - nearest
             - closest
+    middle:
+        phrases:
+            - middle
 # Height
     tallest:
         phrases:
