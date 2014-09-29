@@ -16,9 +16,10 @@ import sys
 # ######################################################################
 
 # Logging
-ERROR_PRINTING_DEFAULT = True
-INFO_PRINTING_DEFAULT = True
 DEBUG_PRINTING_DEFAULT = True
+INFO_PRINTING_DEFAULT = True
+ERROR_PRINTING_DEFAULT = True
+WARN_PRINTING_DEFAULT = True
 
 # Numbers
 FLOAT_COMPARE_EPSILON = 0.001
@@ -77,22 +78,28 @@ class Logger(object):
         return retstr
 
 
-# Error
-class Error(Logger):
-    printing = ERROR_PRINTING_DEFAULT
-    prefix = '[ERROR]'
-
-
 # Debugging
+class Debug(Logger):
+    printing = DEBUG_PRINTING_DEFAULT
+    prefix = '[DEBUG]'
+
+
+# Information
 class Info(Logger):
     printing = INFO_PRINTING_DEFAULT
     prefix = '[INFO]'
 
 
-# Debugging
-class Debug(Logger):
-    printing = DEBUG_PRINTING_DEFAULT
-    prefix = '[DEBUG]'
+# Warnings
+class Warn(Logger):
+    printing = WARN_PRINTING_DEFAULT
+    prefix = '[WARN]'
+
+
+# Error
+class Error(Logger):
+    printing = ERROR_PRINTING_DEFAULT
+    prefix = '[ERROR]'
 
 
 class Fs:

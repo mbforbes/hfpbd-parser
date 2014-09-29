@@ -167,13 +167,17 @@ class ROSFrontend(Frontend):
         # And finally return
         return rc
 
-    def ground(self, grounding_query):
+    def ground(self, query):
         # Ground as normal
-        res = super(ROSFrontend, self).ground(grounding_query)
+        res = super(ROSFrontend, self).ground(query)
 
         # Maybe publish to ROS.
-        if self.ros_running and self.hfgrounding_pub is not None:
-            self.hfgrounding_pub.publish(self.make_grounding_msg(res))
+        if (len(res) > 0 and self.ros_running and
+                self.hfgrounding_pub is not None):
+            self.hfgrounding_pub.publish(self.make_grounding_msg(res, query))
+
+        # And finally return
+        return res
 
     # New functions ----------------------------------------------------
 
@@ -429,10 +433,8 @@ class CLFrontend(ROSFrontend):
         for sentence in self.parser.sentences:
             print sentence.get_raw()
 
-        # Debug
-        wobjs = [WorldObject(o) for o in WorldObject.gen_objs()]
-
         # Look for object options
+        wobjs = [WorldObject(o) for o in WorldObject.gen_objs()]
         sentence_set = set()
         self.set_world(world_objects=wobjs)
         for opt in self.parser.options:

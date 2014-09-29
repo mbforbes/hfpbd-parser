@@ -42,6 +42,10 @@ def parse():
             if request.form['type'] == 'describe':
                 res = frontend.describe()
                 debug = frontend.get_buffer()
+            elif request.form['type'] == 'ground':
+                data = request.form['groundquery']
+                res = frontend.ground(data)
+                debug = frontend.get_buffer()
             else:
                 # request.form['type'] == 'parse'
                 data = request.form['inputtext']

@@ -35,6 +35,7 @@ __author__ = 'mbforbes'
 # Builtins
 from collections import Counter
 from operator import attrgetter
+import time
 import threading
 import yaml
 
@@ -42,7 +43,7 @@ import yaml
 from constants import C, N
 from grammar import CommandDict, Sentence, Command, ObjectOption
 from roslink import Robot, WorldObject, RobotCommand
-from util import Error, Info, Debug, Numbers
+from util import Error, Warn, Info, Debug, Numbers
 
 
 # ######################################################################
@@ -79,7 +80,6 @@ class Parser(object):
 
         # Initialize (for clarity)
         self.world_objects = None
-        self.world_objects_for_generation = None
         self.robot = None
         self.phrases = None
         self.options = None
@@ -131,7 +131,8 @@ class Parser(object):
         obj_opts = [o for o in self.options if isinstance(o, ObjectOption)]
         Info.p(obj_opts)
 
-        # Get flattened list of identities & count occurrences of each.
+        # Get flattened list of identifiers (color & shape) & count
+        # occurrences of each.
         idents = Counter([
             i for s in [
                 o.structured_word_options[ObjectOption.IDENT] +
@@ -261,6 +262,13 @@ class Parser(object):
         res = {}
         gq_sentence = Sentence([p for p in self.phrases if p.found_in(gq)])
         opts = [o for o in self.options if isinstance(o, ObjectOption)]
+
+        # Check if we don't have any objects (actually quite common).
+        if len(opts) == 0:
+            Warn.p("Trying to do grounding with no objects; empty result.")
+            self.lock.release()
+            return res
+
         scores = []
         for o in opts:
             phrase_sets = o.get_phrases()
@@ -365,32 +373,29 @@ class Parser(object):
             - self.world_objects ([WorldObject])
             - self.robot (Robot)
         '''
-        self._update_world_internal_maybe_generate()
+        self._update_world_internal_generate()
         self._update_world_internal_score()
 
-    def _update_world_internal_maybe_generate(self):
+    def _update_world_internal_generate(self):
         '''
         This part generates all templates (phrases, options, commands,
         sentences) and takes a long time. It doesn't apply the world
-        objects or robot to the prior scores. This only needs to happen
-        when the world objects change in a significant way (i.e. they
-        are different objects, not just differently reachable). This is
-        because the sentences that the same objects generate won't
-        change if only their reachability and location, not their
-        properties, have changed.
+        objects or robot to the prior scores.
         '''
-        # First, see whether we need to do this at all.
-        if WorldObject.check_objects_match(
-                self.world_objects, self.world_objects_for_generation):
-            Debug.p("Objects match; not re-generating.")
-            return
-        else:
-            Debug.p("Objects do not match; re-generating.")
+        # Timing
+        # Time the generation, as it probably isn't woth the
+        # optimization if it gives us object mismatch bugs we have to
+        # much about and solve.
+        times = []
+        times += [(time.time(), "start")]
 
         # Make templates (this extracts options and params).
-        self.world_objects_for_generation = self.world_objects
         self.phrases, self.options, self.templates = (
             self.command_dict.get_grammar(self.world_objects))
+
+        # Timing
+        gitems = len(self.phrases) + len(self.options) + len(self.templates)
+        times += [(time.time(), "get grammar (%d)" % (gitems))]
 
         # Some initial displaying
         Info.p("Phrases: " + str(len(self.phrases)))
@@ -405,14 +410,42 @@ class Parser(object):
         self.commands = [i for s in self.commands for i in s]  # Flatten.
         Info.p("Commands: " + str(len(self.commands)))
 
+        # Timing
+        times += [(time.time(), "make commands (%d)" % (len(self.commands)))]
+
         # Make sentences
         self.sentences = [c.generate_sentences() for c in self.commands]
         self.sentences = [i for s in self.sentences for i in s]  # Flatten.
         Info.p("Sentences: " + str(len(self.sentences)))
 
+        # Timing
+        times += [(time.time(), "make sentences (%d)" % (len(self.sentences)))]
+
         # Pre-score commands with all possible sentences.
         for c in self.commands:
             c.score_match_sentences(self.sentences)  # Auto-normalizes.
+
+        # Timing
+        cxs = len(self.commands) * len(self.sentences)
+        times += [
+            (time.time(), "score match commands w/ sentences (%d)" % (cxs))]
+        self._display_timing(times)
+
+    def _display_timing(self, tuples):
+        '''
+        Display timing info.
+
+        Args:
+            tuples ([(float, str)])
+        '''
+        Info.p("Timing:")
+        start_time = tuples[0][0]
+        last_time = start_time
+        for t, n in tuples[1:]:
+            diff = t - last_time
+            Info.pl(1, "%0.4f %s" % (diff, n))
+            last_time = t
+        Info.pl(1, "%0.4f %s" % (last_time - start_time, 'total'))
 
     def _update_world_internal_score(self):
         '''
