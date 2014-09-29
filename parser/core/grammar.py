@@ -476,7 +476,8 @@ class Command(object):
         (like open right hand with right hand open) or non-last-referred
         side commands (like move right hand when left hand last moved).
 
-        - all side: last commanded? (less linkely down)
+        - all w/ obj: last referred obj? (if not, down)
+        - all w/ side: last commanded? (less likely down)
         - all open/close: based on state (impossible down)
         - all pickup/place: based on state (impossible down)
         - move_abs: absdir possible to move to
@@ -491,6 +492,13 @@ class Command(object):
                 self.score += N.P_DUMBSTOP
             elif self.name == 'execute' and is_exec:
                 self.score += N.P_DUMBEXEC
+
+        # Weight against non-last-referred object commands.
+        if (self.template.has_params(['obj']) and
+                robot.has_property('last_referred_obj_name')):
+            last_obj_name = robot.get_property('last_referred_obj_name')
+            if self.option_map['obj'].name != last_obj_name:
+                self.score -= N.P_NOTLASTREFOBJ
 
         # All following robot applications involve a side.
         if not self.template.has_params(['side']):

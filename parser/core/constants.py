@@ -46,6 +46,7 @@ class N(object):
     P_LOCUNR = -5.0  # Penalty: the requested location is unreachable.
     P_OBJUNR = -5.0  # Penalty: the requested object cannot be picked up.
     P_NOTLASTSIDE = -0.1  # Penalty: the side wasn't the last commanded.
+    P_NOTLASTREFOBJ = -0.1  # Penalty: the obj wasn't the last referred.
     P_GSTATE = -8.0  # Penalty: nonsensical gripper state change requested.
     P_DUMBSTOP = -10.0  # Penalty: can't stop when not executing.
     P_DUMBEXEC = -10.0  # Penalty: can't execute when already doing so.
@@ -138,14 +139,14 @@ class C(object):
     op_strs = [
         'name',
         'color',
-        'type'
+        'type',
     ]
 
     # These, like those in M_OP, are bool[]s, but these don't require
     # translating from component options to object properties because they
     # are always accessed directly by object property name.
     op_boolarrs = [
-        'is_pickupable'
+        'is_pickupable',
     ]
 
     # Robot constants
@@ -163,15 +164,16 @@ class C(object):
 
     # Robot properties whose vals are typed str.
     rp_strs = [
-        'last_cmd_side'
+        'last_cmd_side',
+        'last_referred_obj_name',
     ]
 
     # Robot properties whose vals are typed bool[].
     rp_bool_arrs = [
-        'gripper_states'
+        'gripper_states',
     ]
 
     # Robot properties whose vals are typed bool.
     rp_bools = [
-        'is_executing'
+        'is_executing',
     ]

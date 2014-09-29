@@ -63,6 +63,9 @@ commands:
     close:
         - close
         - side
+    # Action 13: Record object positions.
+    record:
+        - record
     # 'Admin' commands
     # ----------------
     execute:
@@ -229,6 +232,12 @@ options:
     close:
         phrases:
             - close
+        strategy: verb
+    record:
+        phrases:
+            - record
+            - record-objects
+            - record-object-positions
         strategy: verb
     execute:
         phrases:
