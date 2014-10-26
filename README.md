@@ -39,7 +39,7 @@ $ python parser/web/web_interface.py noros
 ```
 
 ### Command line interface (without ROS)
-```
+```bash
 # Run the parser with no robot or wold state. Useful for testing non-relative
 # commands and sanity checking. Runs an interactive loop that parses typed
 # input.
